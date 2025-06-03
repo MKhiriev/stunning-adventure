@@ -38,8 +38,15 @@ func MetricHandler(w http.ResponseWriter, r *http.Request) {
 
 	metricType, metricName, metricValue := urlParts[0], urlParts[1], urlParts[2]
 
-	if !slices.Contains(metrics, metricType) {
+	// if metric name is not specified
+	if metricName == "" {
 		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	// if metric type is not valued => http.StatusBadRequest
+	if !slices.Contains(metrics, metricType) {
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
@@ -48,8 +55,9 @@ func MetricHandler(w http.ResponseWriter, r *http.Request) {
 	metric.Value = new(float64)
 	if metricType == models.Counter {
 		counterValue, conversionError := strconv.ParseInt(metricValue, 10, 64)
+		// if metric value type is wrong => http.StatusBadRequest
 		if conversionError != nil {
-			w.WriteHeader(http.StatusNotFound)
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 		// define metric value
@@ -70,15 +78,13 @@ func MetricHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		//w.Write([]byte(fmt.Sprintf(
-		//	"Metric name: %s | Delta: %d | Value: %f", metricName, *memory[metricName].Delta, *memory[metricName].Value,
-		//)))
 		return
 	}
 	if metricType == models.Gauge {
 		gaugeValue, conversionError := strconv.ParseFloat(metricValue, 64)
+		// if metric value type is wrong => http.StatusBadRequest
 		if conversionError != nil {
-			w.WriteHeader(http.StatusNotFound)
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 		metric.MType = models.Gauge
@@ -92,9 +98,6 @@ func MetricHandler(w http.ResponseWriter, r *http.Request) {
 			memory[metricName] = metric
 		}
 		w.WriteHeader(http.StatusOK)
-		//w.Write([]byte(fmt.Sprintf(
-		//	"Metric name: %s | Delta: %d | Value: %f", metricName, *memory[metricName].Delta, *memory[metricName].Value,
-		//)))
 		return
 	}
 }
