@@ -56,6 +56,7 @@ func (h *Handler) MetricHandler(w http.ResponseWriter, r *http.Request) {
 		_, err := h.MemStorage.AddCounter(counterMetricToSave)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
 			return
 		}
 
@@ -72,13 +73,14 @@ func (h *Handler) MetricHandler(w http.ResponseWriter, r *http.Request) {
 
 		gaugeMetricToSave := models.Metrics{
 			ID:    metricName,
-			MType: models.Counter,
+			MType: models.Gauge,
 			Value: &gaugeValue,
 		}
 
 		_, err := h.MemStorage.UpdateGauge(gaugeMetricToSave)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
 			return
 		}
 
