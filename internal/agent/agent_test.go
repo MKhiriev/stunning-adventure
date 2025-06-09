@@ -81,7 +81,7 @@ func TestSendMetrics(t *testing.T) {
 			agent.Memory.Metrics = map[string]models.Metrics{
 				test.metric.ID: test.metric,
 			}
-			server := getHttpServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				assert.NotEmpty(t, r.URL.Path, test.want.route)
 				assert.Contains(t, strings.Split(r.URL.Path, "/"), test.metric.ID)
 				assert.Contains(t, strings.Split(r.URL.Path, "/"), test.metric.MType)
@@ -103,10 +103,6 @@ func TestSendMetrics(t *testing.T) {
 
 func initAgent() *MetricsAgent {
 	return NewMetricsAgent("0.0.0.0", "update")
-}
-
-func getHttpServer(handler http.Handler) *httptest.Server {
-	return httptest.NewServer(handler)
 }
 
 func mDelta(v int) *int64 {
