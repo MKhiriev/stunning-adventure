@@ -19,16 +19,16 @@ const (
 type MetricsAgent struct {
 	ServerAddress string
 	Route         string
-	Client        http.Client
+	Client        *http.Client
 	Memory        *AgentStorage
 	PollCount     int64
 }
 
 func NewMetricsAgent(serverAddress string, route string) *MetricsAgent {
 	return &MetricsAgent{
-		ServerAddress: serverAddress,
+		ServerAddress: "http://" + serverAddress,
 		Route:         route,
-		Client:        http.Client{Timeout: 10 * time.Second},
+		Client:        &http.Client{Timeout: 10 * time.Second},
 		Memory:        NewStorage(),
 		PollCount:     0,
 	}
@@ -66,7 +66,7 @@ func (m *MetricsAgent) SendMetrics() error {
 		if err != nil {
 			return err
 		}
-		request.Header.Add("`Content-Type", "text/plain")
+		request.Header.Add("Content-Type", "text/plain")
 		response, err := m.Client.Do(request)
 		if err != nil {
 			return err
@@ -143,8 +143,8 @@ func (m *MetricsAgent) getRoute(metric models.Metrics) (string, error) {
 			return "", errors.New("no metric's data has been passed: field Delta is nil")
 		}
 
-		return fmt.Sprintf("http://%s/%s/%s/%s/%d", m.ServerAddress, m.Route,
-			metric.MType, metric.ID, metric.Delta), nil
+		return fmt.Sprintf("%s/%s/%s/%s/%d", m.ServerAddress, m.Route,
+			metric.MType, metric.ID, *metric.Delta), nil
 	}
 
 	if metric.MType == models.Gauge {
@@ -153,15 +153,11 @@ func (m *MetricsAgent) getRoute(metric models.Metrics) (string, error) {
 			return "", errors.New("no metric's data has been passed: field Value in nil")
 		}
 
-		return fmt.Sprintf("http://%s/%s/%s/%s/%.0f", m.ServerAddress, m.Route,
+		return fmt.Sprintf("%s/%s/%s/%s/%.0f", m.ServerAddress, m.Route,
 			metric.MType, metric.ID, *metric.Value), nil
 	}
 
 	return "", errors.New("error occurred during route construction")
-}
-
-func HumanReadableFloat64(v uint64) float64 {
-	return math.Float64frombits(v)
 }
 
 func gaugeMetric(name string, value float64) models.Metrics {

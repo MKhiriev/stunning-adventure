@@ -9,6 +9,7 @@ import (
 )
 
 func (h *Handler) MetricHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Content-Type", "text/plain")
 	metrics := []string{"gauge", "counter"}
 
 	// check if request method is POST
