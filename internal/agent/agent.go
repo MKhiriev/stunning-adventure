@@ -71,6 +71,7 @@ func (m *MetricsAgent) SendMetrics() error {
 		if err != nil {
 			return err
 		}
+		defer response.Body.Close()
 		if response.StatusCode != http.StatusOK {
 			return fmt.Errorf("error during metrics sending: %s", response.Status)
 		}
