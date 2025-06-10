@@ -2,31 +2,21 @@ package handlers
 
 import (
 	"github.com/MKhiriev/stunning-adventure/models"
+	"github.com/go-chi/chi/v5"
+	"html/template"
+	"log"
 	"net/http"
 	"slices"
 	"strconv"
-	"strings"
 )
 
 func (h *Handler) MetricHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "text/plain")
-	metrics := []string{"gauge", "counter"}
+	metrics := []string{models.Gauge, models.Counter}
 
-	// check if request method is POST
-	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	// check if URL has 3 parts of metric
-	url := r.URL
-	urlParts := strings.Split(url.String(), "/")[2:]
-	if len(urlParts) != 3 {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	metricType, metricName, metricValue := urlParts[0], urlParts[1], urlParts[2]
+	metricType := chi.URLParam(r, "metricType")
+	metricName := chi.URLParam(r, "metricName")
+	metricValue := chi.URLParam(r, "metricValue")
 
 	// if metric name is not specified
 	if metricName == "" {
@@ -88,4 +78,63 @@ func (h *Handler) MetricHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
+}
+
+func (h *Handler) GetMetricValue(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Content-Type", "text/plain")
+	metricType := chi.URLParam(r, "metricType")
+	metricName := chi.URLParam(r, "metricName")
+
+	if metricName == "" {
+		w.WriteHeader(http.StatusNotFound)
+	}
+
+	metrics := []string{models.Gauge, models.Counter}
+	if !slices.Contains(metrics, metricType) {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	metric, isMetricFound := h.MemStorage.GetMetricByNameAndType(metricName, metricType)
+
+	// if metric is present
+	if isMetricFound == true {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(
+			h.getValueFromMetric(metric),
+		))
+	} else {
+		// if not present - return not found
+		w.WriteHeader(http.StatusNotFound)
+	}
+}
+
+func (h *Handler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
+	html, err := template.ParseFiles("web/template/all-metrics.html", "web/template/metrics-list.html")
+	if err != nil {
+		log.Println("GetAllMetrics(): error occurred during reading html file")
+		return
+	}
+
+	allMetrics := h.MemStorage.GetAllMetrics()
+	type HTMLMetric struct {
+		ID    string
+		MType string
+		Value string
+	}
+	allHTMLMetrics := make([]HTMLMetric, len(allMetrics))
+	for idx, metric := range allMetrics {
+		allHTMLMetrics[idx] = HTMLMetric{ID: metric.ID, MType: metric.MType, Value: h.getValueFromMetric(metric)}
+	}
+	err = html.Execute(w, allHTMLMetrics)
+}
+
+func (h *Handler) getValueFromMetric(metric models.Metrics) string {
+	if metric.MType == models.Counter && metric.Delta != nil {
+		return strconv.Itoa(int(*metric.Delta))
+	}
+	if metric.MType == models.Gauge && metric.Value != nil {
+		return strconv.FormatFloat(*metric.Value, 'f', 0, 64)
+	}
+	return ""
 }

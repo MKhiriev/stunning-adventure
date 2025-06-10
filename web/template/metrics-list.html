@@ -1,0 +1,13 @@
+{{ define "metrics" }}
+  <div>
+    <p> {{ len . }} total metrics </p>
+  </div>
+  <div>
+    <ul>
+      {{ range . }}
+          <li>ID: {{ .ID }} Type: {{ .MType }} Value: {{ .Value }}</li>
+      {{ end }}
+    </ul>
+  </div>
+{{ end }}
+

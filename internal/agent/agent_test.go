@@ -4,7 +4,6 @@ import (
 	"github.com/MKhiriev/stunning-adventure/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -38,11 +37,9 @@ func TestReadMetrics(t *testing.T) {
 			// check for non nil values
 			for _, metric := range agent.Memory.Metrics {
 				if metric.MType == models.Gauge {
-					log.Println(metric)
 					assert.NotNil(t, metric.Value)
 				}
 				if metric.MType == models.Counter {
-					log.Println(metric)
 					assert.NotNil(t, metric.Delta)
 				}
 			}
@@ -75,6 +72,16 @@ func TestSendMetrics(t *testing.T) {
 				route:       "/update/counter/someMetric/527",
 			},
 		},
+		{
+			name:       "positive gauge test #2",
+			metric:     models.Metrics{ID: "someMetric", MType: models.Gauge, Value: mValue(527)},
+			httpMethod: http.MethodPost,
+			want: want{
+				code:        http.StatusOK,
+				contentType: "text/plain",
+				route:       "/update/gauge/someMetric/527",
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -85,7 +92,13 @@ func TestSendMetrics(t *testing.T) {
 				assert.NotEmpty(t, r.URL.Path, test.want.route)
 				assert.Contains(t, strings.Split(r.URL.Path, "/"), test.metric.ID)
 				assert.Contains(t, strings.Split(r.URL.Path, "/"), test.metric.MType)
-				assert.Contains(t, strings.Split(r.URL.Path, "/"), strconv.Itoa(int(*test.metric.Delta)))
+				if test.metric.MType == models.Counter {
+					assert.Contains(t, strings.Split(r.URL.Path, "/"), strconv.Itoa(int(*test.metric.Delta)))
+				}
+				if test.metric.MType == models.Gauge {
+					assert.Contains(t, strings.Split(r.URL.Path, "/"), strconv.FormatFloat(*test.metric.Value, 'f', 0, 64))
+				}
+
 				assert.Equal(t, test.want.contentType, r.Header.Get("Content-Type"))
 
 				w.Header().Add("Content-Type", "text/plain")
@@ -93,7 +106,6 @@ func TestSendMetrics(t *testing.T) {
 			}))
 			defer server.Close()
 			agent.ServerAddress = server.URL
-			agent.Client = server.Client()
 
 			sendMetricsError := agent.SendMetrics()
 			require.NoError(t, sendMetricsError)

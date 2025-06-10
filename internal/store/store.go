@@ -3,11 +3,15 @@ package store
 import (
 	"errors"
 	"github.com/MKhiriev/stunning-adventure/models"
+	"maps"
+	"slices"
 )
 
 type MetricsStorage interface {
 	AddCounter(models.Metrics) (models.Metrics, error)
 	UpdateGauge(models.Metrics) (models.Metrics, error)
+	GetMetricByNameAndType(metricName string, metricType string) (models.Metrics, bool)
+	GetAllMetrics() []models.Metrics
 }
 type MemStorage struct {
 	Memory map[string]models.Metrics
@@ -53,4 +57,20 @@ func (m *MemStorage) UpdateGauge(metrics models.Metrics) (models.Metrics, error)
 	}
 
 	return models.Metrics{}, nil
+}
+
+func (m *MemStorage) GetMetricByNameAndType(metricName string, metricType string) (models.Metrics, bool) {
+	foundMetric, ok := m.Memory[metricName]
+	if ok {
+		if foundMetric.MType == metricType {
+			return foundMetric, true
+		}
+		return models.Metrics{}, false
+	}
+
+	return models.Metrics{}, false
+}
+
+func (m *MemStorage) GetAllMetrics() []models.Metrics {
+	return slices.Collect(maps.Values(m.Memory))
 }

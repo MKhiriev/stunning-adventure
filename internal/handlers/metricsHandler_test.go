@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/MKhiriev/stunning-adventure/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
@@ -11,6 +12,8 @@ import (
 
 func TestMetricHandler(t *testing.T) {
 	h := initHandler()
+	ts := httptest.NewServer(h.Init())
+	defer ts.Close()
 
 	type want struct {
 		code        int
@@ -47,7 +50,7 @@ func TestMetricHandler(t *testing.T) {
 			httpMethod: http.MethodPost,
 			want: want{
 				code:        http.StatusNotFound,
-				contentType: "text/plain",
+				contentType: "text/plain; charset=utf-8",
 			},
 		},
 		{
@@ -55,8 +58,8 @@ func TestMetricHandler(t *testing.T) {
 			route:      "/update/gauge/Alloc/9999999",
 			httpMethod: http.MethodGet,
 			want: want{
-				code:        http.StatusNotFound,
-				contentType: "text/plain",
+				code:        http.StatusMethodNotAllowed,
+				contentType: "",
 			},
 		},
 		{
@@ -80,24 +83,66 @@ func TestMetricHandler(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			request := httptest.NewRequest(test.httpMethod, test.route, nil)
-			// создаём новый Recorder
-			w := httptest.NewRecorder()
-			h.MetricHandler(w, request)
+			res, _ := testRequest(t, ts, test.httpMethod, test.route)
 
-			res := w.Result()
-			// проверяем код ответа
+			// check if status code is correct
 			assert.Equal(t, test.want.code, res.StatusCode)
-			// получаем и проверяем тело запроса
-			defer res.Body.Close()
-			_, err := io.ReadAll(res.Body)
-
-			require.NoError(t, err)
 			assert.Equal(t, test.want.contentType, res.Header.Get("Content-Type"))
 		})
 	}
 }
 
+func TestGetValueFromMetric(t *testing.T) {
+	h := initHandler()
+	type want struct {
+		result string
+	}
+	tests := []struct {
+		name   string
+		metric models.Metrics
+		want   want
+	}{{
+		name:   "positive gauge value test #1",
+		metric: models.Metrics{ID: "Alloc", MType: models.Gauge, Value: mValue(10)},
+		want:   want{result: "10"},
+	}}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			val := h.getValueFromMetric(test.metric)
+			assert.NotEmpty(t, val)
+			assert.Equal(t, test.want.result, val)
+		})
+	}
+
+}
+
 func initHandler() *Handler {
 	return NewHandler()
+}
+
+func mDelta(v int) *int64 {
+	deltaValue := int64(v)
+	return &deltaValue
+}
+
+func mValue(v int) *float64 {
+	value := float64(v)
+	return &value
+}
+
+// testRequest from Yandex.Practicum
+func testRequest(t *testing.T, ts *httptest.Server, method,
+	path string) (*http.Response, string) {
+	req, err := http.NewRequest(method, ts.URL+path, nil)
+	require.NoError(t, err)
+
+	resp, err := ts.Client().Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	return resp, string(respBody)
 }

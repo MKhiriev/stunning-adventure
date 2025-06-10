@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/MKhiriev/stunning-adventure/models"
-	"math"
+	"github.com/go-resty/resty/v2"
 	"math/rand/v2"
 	"net/http"
 	"runtime"
@@ -12,14 +12,14 @@ import (
 )
 
 const (
-	PollInterval   = time.Duration(1 * time.Second)
-	ReportInterval = time.Duration(5 * time.Second)
+	PollInterval   = time.Duration(2 * time.Second)
+	ReportInterval = time.Duration(10 * time.Second)
 )
 
 type MetricsAgent struct {
 	ServerAddress string
 	Route         string
-	Client        *http.Client
+	Client        *resty.Client
 	Memory        *AgentStorage
 	PollCount     int64
 }
@@ -28,7 +28,7 @@ func NewMetricsAgent(serverAddress string, route string) *MetricsAgent {
 	return &MetricsAgent{
 		ServerAddress: "http://" + serverAddress,
 		Route:         route,
-		Client:        &http.Client{Timeout: 10 * time.Second},
+		Client:        resty.New(),
 		Memory:        NewStorage(),
 		PollCount:     0,
 	}
@@ -62,18 +62,15 @@ func (m *MetricsAgent) SendMetrics() error {
 			return err
 		}
 
-		request, err := http.NewRequest(http.MethodPost, route, nil)
+		response, err := m.Client.R().
+			SetHeader("Content-Type", "text/plain").
+			Post(route)
 		if err != nil {
 			return err
 		}
-		request.Header.Add("Content-Type", "text/plain")
-		response, err := m.Client.Do(request)
-		if err != nil {
-			return err
-		}
-		defer response.Body.Close()
-		if response.StatusCode != http.StatusOK {
-			return fmt.Errorf("error during metrics sending: %s", response.Status)
+
+		if response.StatusCode() != http.StatusOK {
+			return fmt.Errorf("error during metrics sending: %s", response.Status())
 		}
 	}
 	return nil
@@ -104,33 +101,33 @@ func (m *MetricsAgent) Run() error {
 
 func (m *MetricsAgent) getSliceOfMetrics(memStats runtime.MemStats) []models.Metrics {
 	return []models.Metrics{
-		gaugeMetric("Alloc", math.Float64frombits(memStats.Alloc)),
-		gaugeMetric("BuckHashSys", math.Float64frombits(memStats.BuckHashSys)),
-		gaugeMetric("Frees", math.Float64frombits(memStats.Frees)),
+		gaugeMetric("Alloc", float64(memStats.Alloc)),
+		gaugeMetric("BuckHashSys", float64(memStats.BuckHashSys)),
+		gaugeMetric("Frees", float64(memStats.Frees)),
 		gaugeMetric("GCCPUFraction", memStats.GCCPUFraction),
-		gaugeMetric("GCSys", math.Float64frombits(memStats.GCSys)),
-		gaugeMetric("HeapAlloc", math.Float64frombits(memStats.HeapAlloc)),
-		gaugeMetric("HeapIdle", math.Float64frombits(memStats.HeapIdle)),
-		gaugeMetric("HeapInuse", math.Float64frombits(memStats.HeapInuse)),
-		gaugeMetric("HeapObjects", math.Float64frombits(memStats.HeapObjects)),
-		gaugeMetric("HeapReleased", math.Float64frombits(memStats.HeapReleased)),
-		gaugeMetric("HeapSys", math.Float64frombits(memStats.HeapSys)),
-		gaugeMetric("LastGC", math.Float64frombits(memStats.LastGC)),
-		gaugeMetric("Lookups", math.Float64frombits(memStats.Lookups)),
-		gaugeMetric("MCacheInuse", math.Float64frombits(memStats.MCacheInuse)),
-		gaugeMetric("MCacheSys", math.Float64frombits(memStats.MCacheSys)),
-		gaugeMetric("MSpanInuse", math.Float64frombits(memStats.MSpanInuse)),
-		gaugeMetric("MSpanSys", math.Float64frombits(memStats.MSpanSys)),
-		gaugeMetric("Mallocs", math.Float64frombits(memStats.Mallocs)),
-		gaugeMetric("NextGC", math.Float64frombits(memStats.NextGC)),
-		gaugeMetric("NumForcedGC", float64(math.Float32frombits(memStats.NumForcedGC))),
-		gaugeMetric("NumGC", float64(math.Float32frombits(memStats.NumGC))),
-		gaugeMetric("OtherSys", math.Float64frombits(memStats.OtherSys)),
-		gaugeMetric("PauseTotalNs", math.Float64frombits(memStats.PauseTotalNs)),
-		gaugeMetric("StackInuse", math.Float64frombits(memStats.StackInuse)),
-		gaugeMetric("StackSys", math.Float64frombits(memStats.StackSys)),
-		gaugeMetric("Sys", math.Float64frombits(memStats.Sys)),
-		gaugeMetric("TotalAlloc", math.Float64frombits(memStats.TotalAlloc)),
+		gaugeMetric("GCSys", float64(memStats.GCSys)),
+		gaugeMetric("HeapAlloc", float64(memStats.HeapAlloc)),
+		gaugeMetric("HeapIdle", float64(memStats.HeapIdle)),
+		gaugeMetric("HeapInuse", float64(memStats.HeapInuse)),
+		gaugeMetric("HeapObjects", float64(memStats.HeapObjects)),
+		gaugeMetric("HeapReleased", float64(memStats.HeapReleased)),
+		gaugeMetric("HeapSys", float64(memStats.HeapSys)),
+		gaugeMetric("LastGC", float64(memStats.LastGC)),
+		gaugeMetric("Lookups", float64(memStats.Lookups)),
+		gaugeMetric("MCacheInuse", float64(memStats.MCacheInuse)),
+		gaugeMetric("MCacheSys", float64(memStats.MCacheSys)),
+		gaugeMetric("MSpanInuse", float64(memStats.MSpanInuse)),
+		gaugeMetric("MSpanSys", float64(memStats.MSpanSys)),
+		gaugeMetric("Mallocs", float64(memStats.Mallocs)),
+		gaugeMetric("NextGC", float64(memStats.NextGC)),
+		gaugeMetric("NumForcedGC", float64(memStats.NumForcedGC)),
+		gaugeMetric("NumGC", float64(memStats.NumGC)),
+		gaugeMetric("OtherSys", float64(memStats.OtherSys)),
+		gaugeMetric("PauseTotalNs", float64(memStats.PauseTotalNs)),
+		gaugeMetric("StackInuse", float64(memStats.StackInuse)),
+		gaugeMetric("StackSys", float64(memStats.StackSys)),
+		gaugeMetric("Sys", float64(memStats.Sys)),
+		gaugeMetric("TotalAlloc", float64(memStats.TotalAlloc)),
 		counterMetric("PollCount", m.PollCount+1),
 		gaugeMetric("RandomValue", rand.Float64()),
 	}
