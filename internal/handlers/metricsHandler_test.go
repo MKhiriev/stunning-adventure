@@ -103,11 +103,18 @@ func TestGetValueFromMetric(t *testing.T) {
 		name   string
 		metric models.Metrics
 		want   want
-	}{{
-		name:   "positive gauge value test #1",
-		metric: models.Metrics{ID: "Alloc", MType: models.Gauge, Value: mValue(10)},
-		want:   want{result: "10"},
-	}}
+	}{
+		{
+			name:   "positive gauge value test #1",
+			metric: models.Metrics{ID: "Alloc", MType: models.Gauge, Value: mValue(10.0)},
+			want:   want{result: "10"},
+		},
+		{
+			name:   "positive gauge value test #2",
+			metric: models.Metrics{ID: "Alloc", MType: models.Gauge, Value: mValue(123.229)},
+			want:   want{result: "123.229"},
+		},
+	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -128,9 +135,8 @@ func mDelta(v int) *int64 {
 	return &deltaValue
 }
 
-func mValue(v int) *float64 {
-	value := float64(v)
-	return &value
+func mValue(v float64) *float64 {
+	return &v
 }
 
 // testRequest from Yandex.Practicum

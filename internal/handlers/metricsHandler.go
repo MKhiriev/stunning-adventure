@@ -137,7 +137,7 @@ func (h *Handler) getValueFromMetric(metric models.Metrics) string {
 		return strconv.Itoa(int(*metric.Delta))
 	}
 	if metric.MType == models.Gauge && metric.Value != nil {
-		return strconv.FormatFloat(*metric.Value, 'f', 0, 64)
+		return strconv.FormatFloat(*metric.Value, 'f', -1, 64)
 	}
 	return ""
 }
