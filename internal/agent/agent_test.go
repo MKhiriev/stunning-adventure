@@ -96,7 +96,7 @@ func TestSendMetrics(t *testing.T) {
 					assert.Contains(t, strings.Split(r.URL.Path, "/"), strconv.Itoa(int(*test.metric.Delta)))
 				}
 				if test.metric.MType == models.Gauge {
-					assert.Contains(t, strings.Split(r.URL.Path, "/"), strconv.FormatFloat(*test.metric.Value, 'f', 0, 64))
+					assert.Contains(t, strings.Split(r.URL.Path, "/"), strconv.FormatFloat(*test.metric.Value, 'f', -1, 64))
 				}
 
 				assert.Equal(t, test.want.contentType, r.Header.Get("Content-Type"))

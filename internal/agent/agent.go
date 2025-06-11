@@ -150,7 +150,7 @@ func (m *MetricsAgent) getRoute(metric models.Metrics) (string, error) {
 			return "", errors.New("no metric's data has been passed: field Value in nil")
 		}
 
-		return fmt.Sprintf("%s/%s/%s/%s/%.0f", m.ServerAddress, m.Route,
+		return fmt.Sprintf("%s/%s/%s/%s/%.f", m.ServerAddress, m.Route,
 			metric.MType, metric.ID, *metric.Value), nil
 	}
 
