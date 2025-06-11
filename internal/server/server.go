@@ -4,13 +4,15 @@ import (
 	"net/http"
 )
 
+const DefaultServerAddress = "localhost:8080"
+
 type Server struct {
 	server *http.Server
 }
 
-func (s *Server) ServerRun(handler http.Handler, port string) error {
+func (s *Server) ServerRun(handler http.Handler, serverAddress string) error {
 	s.server = &http.Server{
-		Addr:    "localhost:" + port,
+		Addr:    serverAddress,
 		Handler: handler,
 	}
 

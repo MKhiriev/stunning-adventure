@@ -12,26 +12,28 @@ import (
 	"time"
 )
 
-const (
-	PollInterval   = time.Duration(2 * time.Second)
-	ReportInterval = time.Duration(10 * time.Second)
-)
+const DefaultPollInterval = time.Duration(2 * time.Second)
+const DefaultReportInterval = time.Duration(10 * time.Second)
 
 type MetricsAgent struct {
-	ServerAddress string
-	Route         string
-	Client        *resty.Client
-	Memory        *AgentStorage
-	PollCount     int64
+	ServerAddress  string
+	Route          string
+	Client         *resty.Client
+	Memory         *AgentStorage
+	PollCount      int64
+	ReportInterval time.Duration
+	PollInterval   time.Duration
 }
 
-func NewMetricsAgent(serverAddress string, route string) *MetricsAgent {
+func NewMetricsAgent(serverAddress string, route string, reportInterval, pollInterval time.Duration) *MetricsAgent {
 	return &MetricsAgent{
-		ServerAddress: "http://" + serverAddress,
-		Route:         route,
-		Client:        resty.New(),
-		Memory:        NewStorage(),
-		PollCount:     0,
+		ServerAddress:  "http://" + serverAddress,
+		Route:          route,
+		Client:         resty.New(),
+		Memory:         NewStorage(),
+		PollCount:      0,
+		ReportInterval: reportInterval,
+		PollInterval:   pollInterval,
 	}
 }
 
@@ -78,14 +80,14 @@ func (m *MetricsAgent) SendMetrics() error {
 }
 
 func (m *MetricsAgent) Run() error {
-	timeToSendMetrics := time.Now().Add(ReportInterval)
+	timeToSendMetrics := time.Now().Add(m.ReportInterval)
 	for {
 		// Read Metrics
 		if err := m.ReadMetrics(); err != nil {
 			return err
 		}
 		// wait 2 seconds
-		time.Sleep(PollInterval)
+		time.Sleep(m.PollInterval)
 
 		thisMoment := time.Now()
 		// check if it's time to send metrics
@@ -95,7 +97,7 @@ func (m *MetricsAgent) Run() error {
 				return err
 			}
 			// set time to send metrics to the server
-			timeToSendMetrics = time.Now().Add(ReportInterval)
+			timeToSendMetrics = time.Now().Add(m.ReportInterval)
 		}
 	}
 }
