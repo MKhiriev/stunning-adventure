@@ -8,6 +8,7 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"runtime"
+	"strconv"
 	"time"
 )
 
@@ -150,8 +151,9 @@ func (m *MetricsAgent) getRoute(metric models.Metrics) (string, error) {
 			return "", errors.New("no metric's data has been passed: field Value in nil")
 		}
 
-		return fmt.Sprintf("%s/%s/%s/%s/%.0f", m.ServerAddress, m.Route,
-			metric.MType, metric.ID, *metric.Value), nil
+		// return fmt.Sprintf("%s/%s/%s/%s/%.f", m.ServerAddress, m.Route, metric.MType, metric.ID, *metric.Value), nil
+		return fmt.Sprintf("%s/%s/%s/%s/%s", m.ServerAddress, m.Route,
+			metric.MType, metric.ID, strconv.FormatFloat(*metric.Value, 'f', -1, 64)), nil
 	}
 
 	return "", errors.New("error occurred during route construction")

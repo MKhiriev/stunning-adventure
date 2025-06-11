@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"strings"
 	"testing"
 )
@@ -51,10 +50,12 @@ func TestSendMetrics(t *testing.T) {
 	agent := initAgent()
 
 	type want struct {
-		code        int
-		response    string
-		contentType string
-		route       string
+		code          int
+		response      string
+		contentType   string
+		route         string
+		expectedDelta string
+		expectedValue string
 	}
 	tests := []struct {
 		name       string
@@ -67,19 +68,43 @@ func TestSendMetrics(t *testing.T) {
 			metric:     models.Metrics{ID: "someMetric", MType: models.Counter, Delta: mDelta(527)},
 			httpMethod: http.MethodPost,
 			want: want{
-				code:        http.StatusOK,
-				contentType: "text/plain",
-				route:       "/update/counter/someMetric/527",
+				code:          http.StatusOK,
+				contentType:   "text/plain",
+				route:         "/update/counter/someMetric/527",
+				expectedDelta: "527",
 			},
 		},
 		{
 			name:       "positive gauge test #2",
-			metric:     models.Metrics{ID: "someMetric", MType: models.Gauge, Value: mValue(527)},
+			metric:     models.Metrics{ID: "someMetric", MType: models.Gauge, Value: mValue(12779.105)},
 			httpMethod: http.MethodPost,
 			want: want{
-				code:        http.StatusOK,
-				contentType: "text/plain",
-				route:       "/update/gauge/someMetric/527",
+				code:          http.StatusOK,
+				contentType:   "text/plain",
+				route:         "/update/gauge/someMetric/12779.105",
+				expectedValue: "12779.105",
+			},
+		},
+		{
+			name:       "positive gauge test #3",
+			metric:     models.Metrics{ID: "someMetric", MType: models.Gauge, Value: mValue(575962.373)},
+			httpMethod: http.MethodPost,
+			want: want{
+				code:          http.StatusOK,
+				contentType:   "text/plain",
+				route:         "/update/gauge/someMetric/575962.373",
+				expectedValue: "575962.373",
+			},
+		},
+		{
+			name:       "positive gauge test #4",
+			metric:     models.Metrics{ID: "someMetric", MType: models.Gauge, Value: mValue(369111.063)},
+			httpMethod: http.MethodPost,
+			want: want{
+				code:          http.StatusOK,
+				contentType:   "text/plain",
+				route:         "/update/gauge/someMetric/369111.063",
+				expectedValue: "369111.063",
 			},
 		},
 	}
@@ -93,10 +118,10 @@ func TestSendMetrics(t *testing.T) {
 				assert.Contains(t, strings.Split(r.URL.Path, "/"), test.metric.ID)
 				assert.Contains(t, strings.Split(r.URL.Path, "/"), test.metric.MType)
 				if test.metric.MType == models.Counter {
-					assert.Contains(t, strings.Split(r.URL.Path, "/"), strconv.Itoa(int(*test.metric.Delta)))
+					assert.Contains(t, strings.Split(r.URL.Path, "/"), test.want.expectedDelta)
 				}
 				if test.metric.MType == models.Gauge {
-					assert.Contains(t, strings.Split(r.URL.Path, "/"), strconv.FormatFloat(*test.metric.Value, 'f', 0, 64))
+					assert.Contains(t, strings.Split(r.URL.Path, "/"), test.want.expectedValue)
 				}
 
 				assert.Equal(t, test.want.contentType, r.Header.Get("Content-Type"))
@@ -122,7 +147,6 @@ func mDelta(v int) *int64 {
 	return &deltaValue
 }
 
-func mValue(v int) *float64 {
-	value := float64(v)
-	return &value
+func mValue(v float64) *float64 {
+	return &v
 }
