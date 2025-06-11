@@ -123,7 +123,6 @@ func TestGetValueFromMetric(t *testing.T) {
 			assert.Equal(t, test.want.result, val)
 		})
 	}
-
 }
 
 func initHandler() *Handler {

@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestReadMetrics(t *testing.T) {
@@ -139,7 +140,7 @@ func TestSendMetrics(t *testing.T) {
 }
 
 func initAgent() *MetricsAgent {
-	return NewMetricsAgent("0.0.0.0", "update")
+	return NewMetricsAgent("0.0.0.0", "update", time.Duration(10*time.Second), time.Duration(2*time.Second))
 }
 
 func mDelta(v int) *int64 {
