@@ -4,7 +4,6 @@ import (
 	"github.com/MKhiriev/stunning-adventure/models"
 	"github.com/go-chi/chi/v5"
 	"html/template"
-	"log"
 	"net/http"
 	"slices"
 	"strconv"
@@ -98,7 +97,7 @@ func (h *Handler) GetMetricValue(w http.ResponseWriter, r *http.Request) {
 	metric, isMetricFound := h.MemStorage.GetMetricByNameAndType(metricName, metricType)
 
 	// if metric is present
-	if isMetricFound == true {
+	if isMetricFound {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(
 			h.getValueFromMetric(metric),
@@ -112,8 +111,7 @@ func (h *Handler) GetMetricValue(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 	html, err := template.ParseFiles("web/template/all-metrics.html", "web/template/metrics-list.html")
 	if err != nil {
-		log.Println("GetAllMetrics(): error occurred during reading html file")
-		return
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
 	allMetrics := h.MemStorage.GetAllMetrics()
@@ -122,11 +120,16 @@ func (h *Handler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 		MType string
 		Value string
 	}
+
 	allHTMLMetrics := make([]HTMLMetric, len(allMetrics))
 	for idx, metric := range allMetrics {
 		allHTMLMetrics[idx] = HTMLMetric{ID: metric.ID, MType: metric.MType, Value: h.getValueFromMetric(metric)}
 	}
+
 	err = html.Execute(w, allHTMLMetrics)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func (h *Handler) getValueFromMetric(metric models.Metrics) string {

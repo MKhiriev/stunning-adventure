@@ -21,10 +21,11 @@ func TestMetricHandler(t *testing.T) {
 		contentType string
 	}
 	tests := []struct {
-		name       string
-		route      string
-		httpMethod string
-		want       want
+		name          string
+		route         string
+		httpMethod    string
+		storedMetrics map[string]models.Metrics
+		want          want
 	}{
 		{
 			name:       "positive counter test #1",
@@ -58,7 +59,7 @@ func TestMetricHandler(t *testing.T) {
 			route:      "/update/gauge/Alloc/9999999",
 			httpMethod: http.MethodGet,
 			want: want{
-				code:        http.StatusMethodNotAllowed,
+				code:        http.StatusNotFound,
 				contentType: "",
 			},
 		},
@@ -84,6 +85,7 @@ func TestMetricHandler(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			res, _ := testRequest(t, ts, test.httpMethod, test.route)
+			defer res.Body.Close()
 
 			// check if status code is correct
 			assert.Equal(t, test.want.code, res.StatusCode)
@@ -132,8 +134,7 @@ func mValue(v int) *float64 {
 }
 
 // testRequest from Yandex.Practicum
-func testRequest(t *testing.T, ts *httptest.Server, method,
-	path string) (*http.Response, string) {
+func testRequest(t *testing.T, ts *httptest.Server, method, path string) (*http.Response, string) {
 	req, err := http.NewRequest(method, ts.URL+path, nil)
 	require.NoError(t, err)
 
