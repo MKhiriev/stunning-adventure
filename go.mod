@@ -3,6 +3,7 @@ module github.com/MKhiriev/stunning-adventure
 go 1.24.0
 
 require (
+	github.com/caarlos0/env/v11 v11.3.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-chi/chi/v5 v5.2.1 // indirect
 	github.com/go-resty/resty/v2 v2.16.5 // indirect
