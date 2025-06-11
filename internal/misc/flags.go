@@ -12,8 +12,8 @@ import (
 )
 
 var ServerAddress NetAddress
-var PollInterval time.Duration
-var ReportInterval time.Duration
+var PollInterval int64
+var ReportInterval int64
 
 type NetAddress struct {
 	Host string
@@ -36,8 +36,8 @@ func ParseAgentFlags() {
 	_ = flag.Value(&ServerAddress)
 	flag.Var(&ServerAddress, "a", "Net address host:port")
 
-	flag.DurationVar(&PollInterval, "p", agent.DefaultPollInterval, "Poll interval in seconds")
-	flag.DurationVar(&ReportInterval, "r", agent.DefaultReportInterval, "Report interval in seconds")
+	flag.Int64Var(&PollInterval, "p", agent.DefaultPollInterval, "Poll interval in seconds")
+	flag.Int64Var(&ReportInterval, "r", agent.DefaultReportInterval, "Report interval in seconds")
 
 	flag.Parse()
 }
