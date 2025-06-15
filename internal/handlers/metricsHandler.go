@@ -61,7 +61,6 @@ func (h *Handler) HandleGauge(w http.ResponseWriter, metricValue string, metricN
 	}
 
 	w.WriteHeader(http.StatusOK)
-	return
 }
 
 func (h *Handler) HandleCounter(w http.ResponseWriter, metricValue string, metricName string) {
@@ -86,7 +85,6 @@ func (h *Handler) HandleCounter(w http.ResponseWriter, metricValue string, metri
 	}
 
 	w.WriteHeader(http.StatusOK)
-	return
 }
 
 func (h *Handler) GetMetricValue(w http.ResponseWriter, r *http.Request) {
