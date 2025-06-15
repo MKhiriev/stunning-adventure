@@ -30,53 +30,63 @@ func (h *Handler) MetricHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if metricType == models.Counter {
-		counterValue, conversionError := strconv.ParseInt(metricValue, 10, 64)
-		// if metric value type is wrong => http.StatusBadRequest
-		if conversionError != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-
-		counterMetricToSave := models.Metrics{
-			ID:    metricName,
-			MType: models.Counter,
-			Delta: &counterValue,
-		}
-
-		_, err := h.MemStorage.AddCounter(counterMetricToSave)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
+		h.HandleCounter(w, metricValue, metricName)
 		return
 	}
 	if metricType == models.Gauge {
-		gaugeValue, conversionError := strconv.ParseFloat(metricValue, 64)
-		// if metric value type is wrong => http.StatusBadRequest
-		if conversionError != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-
-		gaugeMetricToSave := models.Metrics{
-			ID:    metricName,
-			MType: models.Gauge,
-			Value: &gaugeValue,
-		}
-
-		_, err := h.MemStorage.UpdateGauge(gaugeMetricToSave)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
+		h.HandleGauge(w, metricValue, metricName)
 		return
 	}
+}
+
+func (h *Handler) HandleGauge(w http.ResponseWriter, metricValue string, metricName string) {
+	gaugeValue, conversionError := strconv.ParseFloat(metricValue, 64)
+	// if metric value type is wrong => http.StatusBadRequest
+	if conversionError != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	gaugeMetricToSave := models.Metrics{
+		ID:    metricName,
+		MType: models.Gauge,
+		Value: &gaugeValue,
+	}
+
+	_, err := h.MemStorage.UpdateGauge(gaugeMetricToSave)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	return
+}
+
+func (h *Handler) HandleCounter(w http.ResponseWriter, metricValue string, metricName string) {
+	counterValue, conversionError := strconv.ParseInt(metricValue, 10, 64)
+	// if metric value type is wrong => http.StatusBadRequest
+	if conversionError != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	counterMetricToSave := models.Metrics{
+		ID:    metricName,
+		MType: models.Counter,
+		Delta: &counterValue,
+	}
+
+	_, err := h.MemStorage.AddCounter(counterMetricToSave)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	return
 }
 
 func (h *Handler) GetMetricValue(w http.ResponseWriter, r *http.Request) {

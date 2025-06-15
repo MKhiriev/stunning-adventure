@@ -4,8 +4,6 @@ import (
 	"net/http"
 )
 
-const DefaultServerAddress = "localhost:8080"
-
 type Server struct {
 	server *http.Server
 }

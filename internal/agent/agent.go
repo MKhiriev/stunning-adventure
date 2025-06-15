@@ -12,9 +12,6 @@ import (
 	"time"
 )
 
-const DefaultPollInterval = int64(2)
-const DefaultReportInterval = int64(10)
-
 type MetricsAgent struct {
 	ServerAddress  string
 	Route          string
