@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"github.com/MKhiriev/stunning-adventure/models"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 )
 
@@ -126,7 +128,8 @@ func TestGetValueFromMetric(t *testing.T) {
 }
 
 func initHandler() *Handler {
-	return NewHandler()
+	logger := zerolog.New(os.Stdout).With().Logger()
+	return NewHandler(&logger)
 }
 
 func mDelta(v int) *int64 {
