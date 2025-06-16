@@ -4,17 +4,26 @@ import (
 	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/internal/handlers"
 	"github.com/MKhiriev/stunning-adventure/internal/server"
-	"log"
+	"github.com/rs/zerolog"
+	"os"
 )
 
 func main() {
-	cfg := Init()
-	handler := handlers.NewHandler()
+	cfg, log := Init()
+	log.Info().Msg("Server started")
+
+	handler := handlers.NewHandler(log)
 	myServer := new(server.Server)
 	err := myServer.ServerRun(handler.Init(), cfg.ServerAddress)
-	log.Fatal(err)
+	log.Fatal().Err(err)
 }
 
-func Init() *config.ServerConfig {
-	return config.GetServerConfigs()
+func Init() (*config.ServerConfig, *zerolog.Logger) {
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	logger := zerolog.New(os.Stdout).With().
+		Timestamp().
+		Str("role", "metrics-server").
+		Logger()
+
+	return config.GetServerConfigs(), &logger
 }
