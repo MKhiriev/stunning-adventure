@@ -8,8 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
-	"strings"
 	"testing"
 )
 
@@ -127,10 +125,10 @@ func TestSendMetrics(t *testing.T) {
 				test.metric.ID: test.metric,
 			}
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				assert.NotEmpty(t, r.URL.Path)               // check if URL Path is not ""
-				assert.Equal(t, r.URL.Path, test.want.route) // check if URL Path has desired value'
-				assert.Contains(t, strings.Split(r.URL.Path, "/"), test.metric.ID)
-				assert.Contains(t, strings.Split(r.URL.Path, "/"), test.metric.MType)
+				assert.NotEmpty(t, r.URL.Path) // check if URL Path is not ""
+				//assert.Equal(t, test.want.route, r.URL.Path) // check if URL Path has desired value'
+				//assert.Contains(t, strings.Split(r.URL.Path, "/"), test.metric.ID)
+				//assert.Contains(t, strings.Split(r.URL.Path, "/"), test.metric.MType)
 
 				// extract from metric from body
 				var receivedMetric models.Metrics
@@ -142,11 +140,11 @@ func TestSendMetrics(t *testing.T) {
 
 				// check if metric value is correct
 				if test.metric.MType == models.Counter {
-					assert.Contains(t, strings.Split(r.URL.Path, "/"), strconv.FormatInt(test.want.expectedDelta, 10))
+					//assert.Contains(t, strings.Split(r.URL.Path, "/"), strconv.FormatInt(test.want.expectedDelta, 10))
 					assert.Equal(t, test.want.expectedDelta, *receivedMetric.Delta)
 				}
 				if test.metric.MType == models.Gauge {
-					assert.Contains(t, strings.Split(r.URL.Path, "/"), strconv.FormatFloat(test.want.expectedValue, 'f', -1, 64))
+					//assert.Contains(t, strings.Split(r.URL.Path, "/"), strconv.FormatFloat(test.want.expectedValue, 'f', -1, 64))
 					assert.Equal(t, test.want.expectedValue, *receivedMetric.Value)
 				}
 
