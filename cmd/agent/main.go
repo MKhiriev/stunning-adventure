@@ -8,7 +8,7 @@ import (
 
 func main() {
 	cfg := Init()
-	err := agent.NewMetricsAgent("update/", cfg).Run()
+	err := agent.NewMetricsAgent("update", cfg).Run()
 	log.Fatal(err)
 }
 

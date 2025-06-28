@@ -6,7 +6,6 @@ import (
 	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/models"
 	"github.com/go-resty/resty/v2"
-	"log"
 	"math/rand/v2"
 	"net/http"
 	"runtime"
@@ -56,10 +55,14 @@ func (m *MetricsAgent) SendMetrics() error {
 		return errors.New("no metrics are passed")
 	}
 
-	route := fmt.Sprintf("%s/%s", m.ServerAddress, m.Route)
-	log.Println(route)
 	// send every metric retrieved from memory
 	for _, metric := range allMetrics {
+		// construct route based on metric's type
+		route, err := m.getRoute(metric)
+		if err != nil {
+			return err
+		}
+
 		response, err := m.Client.R().
 			SetHeader("Content-Type", "application/json").
 			SetBody(metric).
@@ -138,8 +141,6 @@ func (m *MetricsAgent) getSliceOfMetrics(memStats runtime.MemStats) []models.Met
 //   - route: specific route for updating metric's value. Default: `update/`
 //   - metric type: models.Counter or models.Gauge
 //   - metric value: *int64(Delta) or *float64(Value)
-//
-// Deprecated: now we send metrics via HTTP-Body in JSON format. No need to construct a route for every update.
 func (m *MetricsAgent) getRoute(metric models.Metrics) (string, error) {
 	if metric.MType == models.Counter {
 		// check if Counter's Delta is not nil

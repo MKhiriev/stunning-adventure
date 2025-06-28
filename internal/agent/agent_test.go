@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -73,7 +75,7 @@ func TestSendMetrics(t *testing.T) {
 			want: want{
 				code:          http.StatusOK,
 				contentType:   "application/json",
-				route:         "/update/",
+				route:         "/update/counter/someMetric/527",
 				expectedID:    "someMetric",
 				expectedDelta: 527,
 				expectedMType: models.Counter,
@@ -86,7 +88,7 @@ func TestSendMetrics(t *testing.T) {
 			want: want{
 				code:          http.StatusOK,
 				contentType:   "application/json",
-				route:         "/update/",
+				route:         "/update/gauge/someMetric/12779.105",
 				expectedID:    "someMetric",
 				expectedValue: 12779.105,
 				expectedMType: models.Gauge,
@@ -99,7 +101,7 @@ func TestSendMetrics(t *testing.T) {
 			want: want{
 				code:          http.StatusOK,
 				contentType:   "application/json",
-				route:         "/update/",
+				route:         "/update/gauge/someMetric/575962.373",
 				expectedID:    "someMetric",
 				expectedValue: 575962.373,
 				expectedMType: models.Gauge,
@@ -112,7 +114,7 @@ func TestSendMetrics(t *testing.T) {
 			want: want{
 				code:          http.StatusOK,
 				contentType:   "application/json",
-				route:         "/update/",
+				route:         "/update/gauge/someMetric/369111.063",
 				expectedID:    "someMetric",
 				expectedValue: 369111.063,
 				expectedMType: models.Gauge,
@@ -126,7 +128,9 @@ func TestSendMetrics(t *testing.T) {
 			}
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				assert.NotEmpty(t, r.URL.Path)               // check if URL Path is not ""
-				assert.Equal(t, r.URL.Path, test.want.route) // check if URL Path has desired value
+				assert.Equal(t, r.URL.Path, test.want.route) // check if URL Path has desired value'
+				assert.Contains(t, strings.Split(r.URL.Path, "/"), test.metric.ID)
+				assert.Contains(t, strings.Split(r.URL.Path, "/"), test.metric.MType)
 
 				// extract from metric from body
 				var receivedMetric models.Metrics
@@ -138,9 +142,11 @@ func TestSendMetrics(t *testing.T) {
 
 				// check if metric value is correct
 				if test.metric.MType == models.Counter {
+					assert.Contains(t, strings.Split(r.URL.Path, "/"), strconv.FormatInt(test.want.expectedDelta, 10))
 					assert.Equal(t, test.want.expectedDelta, *receivedMetric.Delta)
 				}
 				if test.metric.MType == models.Gauge {
+					assert.Contains(t, strings.Split(r.URL.Path, "/"), strconv.FormatFloat(test.want.expectedValue, 'f', -1, 64))
 					assert.Equal(t, test.want.expectedValue, *receivedMetric.Value)
 				}
 
@@ -160,7 +166,7 @@ func TestSendMetrics(t *testing.T) {
 }
 
 func initAgent() *MetricsAgent {
-	return NewMetricsAgent("update/", &config.AgentConfig{
+	return NewMetricsAgent("update", &config.AgentConfig{
 		ServerAddress:  "0.0.0.0",
 		ReportInterval: 2,
 		PollInterval:   1,
