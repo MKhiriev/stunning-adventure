@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"github.com/MKhiriev/stunning-adventure/models"
+	"github.com/go-chi/chi/v5"
 	"html/template"
 	"net/http"
 	"slices"
@@ -10,6 +11,36 @@ import (
 )
 
 func (h *Handler) MetricHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Content-Type", "text/plain")
+	metrics := []string{models.Gauge, models.Counter}
+
+	metricType := chi.URLParam(r, "metricType")
+	metricName := chi.URLParam(r, "metricName")
+	metricValue := chi.URLParam(r, "metricValue")
+
+	// if metric name is not specified
+	if metricName == "" {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	// if metric type is not valued => http.StatusBadRequest
+	if !slices.Contains(metrics, metricType) {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if metricType == models.Counter {
+		h.HandleCounter(w, metricValue, metricName)
+		return
+	}
+	if metricType == models.Gauge {
+		h.HandleGauge(w, metricValue, metricName)
+		return
+	}
+}
+
+func (h *Handler) JSONMetricHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
 	metrics := []string{models.Gauge, models.Counter}
 
@@ -101,6 +132,40 @@ func (h *Handler) GetMetricValue(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (h *Handler) JSONGetMetricValue(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Content-Type", "application/json")
+
+	// get models.Metrics from HTTP Body
+	requestedMetric := models.Metrics{}
+	if err := json.NewDecoder(r.Body).Decode(&requestedMetric); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if requestedMetric.ID == "" {
+		w.WriteHeader(http.StatusNotFound)
+	}
+
+	metrics := []string{models.Gauge, models.Counter}
+	if !slices.Contains(metrics, requestedMetric.MType) {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	metric, isMetricFound := h.MemStorage.GetMetricByNameAndType(requestedMetric.ID, requestedMetric.MType)
+
+	// if metric is present
+	if isMetricFound {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(
+			h.getValueFromMetric(metric),
+		))
+	} else {
+		// if not present - return not found
+		w.WriteHeader(http.StatusNotFound)
+	}
+}
+
 func (h *Handler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 	html, err := template.ParseFiles("web/template/all-metrics.html", "web/template/metrics-list.html")
 	if err != nil {
@@ -123,6 +188,54 @@ func (h *Handler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func (h *Handler) HandleGauge(w http.ResponseWriter, metricValue string, metricName string) {
+	gaugeValue, conversionError := strconv.ParseFloat(metricValue, 64)
+	// if metric value type is wrong => http.StatusBadRequest
+	if conversionError != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	gaugeMetricToSave := models.Metrics{
+		ID:    metricName,
+		MType: models.Gauge,
+		Value: &gaugeValue,
+	}
+
+	_, err := h.MemStorage.UpdateGauge(gaugeMetricToSave)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) HandleCounter(w http.ResponseWriter, metricValue string, metricName string) {
+	counterValue, conversionError := strconv.ParseInt(metricValue, 10, 64)
+	// if metric value type is wrong => http.StatusBadRequest
+	if conversionError != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	counterMetricToSave := models.Metrics{
+		ID:    metricName,
+		MType: models.Counter,
+		Delta: &counterValue,
+	}
+
+	_, err := h.MemStorage.AddCounter(counterMetricToSave)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *Handler) getValueFromMetric(metric models.Metrics) string {

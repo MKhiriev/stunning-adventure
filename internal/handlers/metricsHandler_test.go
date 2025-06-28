@@ -23,6 +23,90 @@ func TestMetricHandler(t *testing.T) {
 		code        int
 		response    string
 		contentType string
+	}
+	tests := []struct {
+		name          string
+		route         string
+		httpMethod    string
+		storedMetrics map[string]models.Metrics
+		want          want
+	}{
+		{
+			name:       "positive counter test #1",
+			route:      "/update/counter/someMetric/527",
+			httpMethod: http.MethodPost,
+			want: want{
+				code:        http.StatusOK,
+				contentType: "text/plain",
+			},
+		},
+		{
+			name:       "positive gauge test #2",
+			route:      "/update/gauge/Alloc/9999999",
+			httpMethod: http.MethodPost,
+			want: want{
+				code:        http.StatusOK,
+				contentType: "text/plain",
+			},
+		},
+		{
+			name:       "negative test #3 - no metric's name",
+			route:      "/update/gauge/9999999",
+			httpMethod: http.MethodPost,
+			want: want{
+				code:        http.StatusNotFound,
+				contentType: "text/plain; charset=utf-8",
+			},
+		},
+		{
+			name:       "negative test #4 - http.Method is not POST",
+			route:      "/update/gauge/Alloc/9999999",
+			httpMethod: http.MethodGet,
+			want: want{
+				code:        http.StatusNotFound,
+				contentType: "",
+			},
+		},
+		{
+			name:       "negative test #5 - unknown type of metric",
+			route:      "/update/otherType/Alloc/9999999",
+			httpMethod: http.MethodPost,
+			want: want{
+				code:        http.StatusBadRequest,
+				contentType: "text/plain",
+			},
+		},
+		{
+			name:       "negative test #6 - wrong value type",
+			route:      "/update/otherType/Alloc/wrongValue",
+			httpMethod: http.MethodPost,
+			want: want{
+				code:        http.StatusBadRequest,
+				contentType: "text/plain",
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			res, _ := testRequest(t, ts, test.httpMethod, test.route, nil)
+			defer res.Body.Close()
+
+			// check if status code is correct
+			assert.Equal(t, test.want.code, res.StatusCode)
+			assert.Equal(t, test.want.contentType, res.Header.Get("Content-Type"))
+		})
+	}
+}
+
+func TestJSONGetMetricValue(t *testing.T) {
+	h := initHandler()
+	ts := httptest.NewServer(h.Init())
+	defer ts.Close()
+
+	type want struct {
+		code        int
+		response    string
+		contentType string
 		metric      models.Metrics
 	}
 	tests := []struct {
