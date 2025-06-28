@@ -24,8 +24,8 @@ func (h *Handler) Init() *chi.Mux {
 
 	router.Use(middleware.Recoverer, h.WithLogging)
 
-	router.Post("/update/{metricType}/{metricName}/{metricValue}", h.MetricHandler)
-	router.Get("/value/{metricType}/{metricName}", h.GetMetricValue)
+	router.Post("/update/", h.MetricHandler)
+	router.Post("/value/", h.GetMetricValue)
 	router.Get("/", h.GetAllMetrics)
 
 	router.MethodNotAllowed(CheckHTTPMethod(router))

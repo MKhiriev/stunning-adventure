@@ -1,12 +1,13 @@
 package agent
 
 import (
+	"encoding/json"
+	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 )
 
@@ -54,8 +55,10 @@ func TestSendMetrics(t *testing.T) {
 		response      string
 		contentType   string
 		route         string
-		expectedDelta string
-		expectedValue string
+		expectedID    string
+		expectedDelta int64
+		expectedValue float64
+		expectedMType string
 	}
 	tests := []struct {
 		name       string
@@ -69,9 +72,11 @@ func TestSendMetrics(t *testing.T) {
 			httpMethod: http.MethodPost,
 			want: want{
 				code:          http.StatusOK,
-				contentType:   "text/plain",
-				route:         "/update/counter/someMetric/527",
-				expectedDelta: "527",
+				contentType:   "application/json",
+				route:         "/update/",
+				expectedID:    "someMetric",
+				expectedDelta: 527,
+				expectedMType: models.Counter,
 			},
 		},
 		{
@@ -80,9 +85,11 @@ func TestSendMetrics(t *testing.T) {
 			httpMethod: http.MethodPost,
 			want: want{
 				code:          http.StatusOK,
-				contentType:   "text/plain",
-				route:         "/update/gauge/someMetric/12779.105",
-				expectedValue: "12779.105",
+				contentType:   "application/json",
+				route:         "/update/",
+				expectedID:    "someMetric",
+				expectedValue: 12779.105,
+				expectedMType: models.Gauge,
 			},
 		},
 		{
@@ -91,9 +98,11 @@ func TestSendMetrics(t *testing.T) {
 			httpMethod: http.MethodPost,
 			want: want{
 				code:          http.StatusOK,
-				contentType:   "text/plain",
-				route:         "/update/gauge/someMetric/575962.373",
-				expectedValue: "575962.373",
+				contentType:   "application/json",
+				route:         "/update/",
+				expectedID:    "someMetric",
+				expectedValue: 575962.373,
+				expectedMType: models.Gauge,
 			},
 		},
 		{
@@ -102,9 +111,11 @@ func TestSendMetrics(t *testing.T) {
 			httpMethod: http.MethodPost,
 			want: want{
 				code:          http.StatusOK,
-				contentType:   "text/plain",
-				route:         "/update/gauge/someMetric/369111.063",
-				expectedValue: "369111.063",
+				contentType:   "application/json",
+				route:         "/update/",
+				expectedID:    "someMetric",
+				expectedValue: 369111.063,
+				expectedMType: models.Gauge,
 			},
 		},
 	}
@@ -114,19 +125,29 @@ func TestSendMetrics(t *testing.T) {
 				test.metric.ID: test.metric,
 			}
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				assert.NotEmpty(t, r.URL.Path, test.want.route)
-				assert.Contains(t, strings.Split(r.URL.Path, "/"), test.metric.ID)
-				assert.Contains(t, strings.Split(r.URL.Path, "/"), test.metric.MType)
+				assert.NotEmpty(t, r.URL.Path)               // check if URL Path is not ""
+				assert.Equal(t, r.URL.Path, test.want.route) // check if URL Path has desired value
+
+				// extract from metric from body
+				var receivedMetric models.Metrics
+				jsonDecodingError := json.NewDecoder(r.Body).Decode(&receivedMetric)
+				assert.NoError(t, jsonDecodingError) // check if there are no error during getting metric from JSON in HTTP Body
+
+				assert.Equal(t, test.want.expectedID, receivedMetric.ID)       // check if ID is correct
+				assert.Equal(t, test.want.expectedMType, receivedMetric.MType) // check if MType is correct
+
+				// check if metric value is correct
 				if test.metric.MType == models.Counter {
-					assert.Contains(t, strings.Split(r.URL.Path, "/"), test.want.expectedDelta)
+					assert.Equal(t, test.want.expectedDelta, *receivedMetric.Delta)
 				}
 				if test.metric.MType == models.Gauge {
-					assert.Contains(t, strings.Split(r.URL.Path, "/"), test.want.expectedValue)
+					assert.Equal(t, test.want.expectedValue, *receivedMetric.Value)
 				}
 
+				// check if `Content-Type` is correct
 				assert.Equal(t, test.want.contentType, r.Header.Get("Content-Type"))
 
-				w.Header().Add("Content-Type", "text/plain")
+				w.Header().Add("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
 			}))
 			defer server.Close()
@@ -139,7 +160,11 @@ func TestSendMetrics(t *testing.T) {
 }
 
 func initAgent() *MetricsAgent {
-	return NewMetricsAgent("0.0.0.0", "update", 2, 1)
+	return NewMetricsAgent("update/", &config.AgentConfig{
+		ServerAddress:  "0.0.0.0",
+		ReportInterval: 2,
+		PollInterval:   1,
+	})
 }
 
 func mDelta(v int) *int64 {

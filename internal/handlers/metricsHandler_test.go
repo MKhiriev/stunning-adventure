@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"github.com/MKhiriev/stunning-adventure/models"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -21,77 +23,95 @@ func TestMetricHandler(t *testing.T) {
 		code        int
 		response    string
 		contentType string
+		metric      models.Metrics
 	}
 	tests := []struct {
-		name          string
-		route         string
-		httpMethod    string
-		storedMetrics map[string]models.Metrics
-		want          want
+		name           string
+		passedJSONBody string
+		route          string
+		httpMethod     string
+		storedMetrics  map[string]models.Metrics
+		want           want
 	}{
 		{
-			name:       "positive counter test #1",
-			route:      "/update/counter/someMetric/527",
-			httpMethod: http.MethodPost,
+			name:           "positive counter test #1",
+			passedJSONBody: `{"id": "someMetric", "type": "counter", "delta": 527}`,
+			route:          "/update/",
+			httpMethod:     http.MethodPost,
 			want: want{
 				code:        http.StatusOK,
-				contentType: "text/plain",
+				contentType: "application/json",
+				metric:      models.Metrics{ID: "someMetric", MType: "counter", Delta: mDelta(527)},
 			},
 		},
 		{
-			name:       "positive gauge test #2",
-			route:      "/update/gauge/Alloc/9999999",
-			httpMethod: http.MethodPost,
+			name:           "positive gauge test #2",
+			passedJSONBody: `{"id": "Alloc", "type": "gauge", "value": 9999999}`,
+			route:          "/update/",
+			httpMethod:     http.MethodPost,
 			want: want{
 				code:        http.StatusOK,
-				contentType: "text/plain",
+				contentType: "application/json",
+				metric:      models.Metrics{ID: "Alloc", MType: "gauge", Value: mValue(9999999)},
 			},
 		},
 		{
-			name:       "negative test #3 - no metric's name",
-			route:      "/update/gauge/9999999",
-			httpMethod: http.MethodPost,
+			name:           "negative test #3 - no metric's name",
+			passedJSONBody: `{"type": "gauge", "value": 9999999}`,
+			route:          "/update/",
+			httpMethod:     http.MethodPost,
 			want: want{
 				code:        http.StatusNotFound,
-				contentType: "text/plain; charset=utf-8",
+				contentType: "application/json",
 			},
 		},
 		{
-			name:       "negative test #4 - http.Method is not POST",
-			route:      "/update/gauge/Alloc/9999999",
-			httpMethod: http.MethodGet,
+			name:           "negative test #4 - http.Method is not POST",
+			passedJSONBody: `{"id": "Alloc", "type": "gauge", "value": 9999999}`,
+			route:          "/update/",
+			httpMethod:     http.MethodGet,
 			want: want{
 				code:        http.StatusNotFound,
 				contentType: "",
 			},
 		},
 		{
-			name:       "negative test #5 - unknown type of metric",
-			route:      "/update/otherType/Alloc/9999999",
-			httpMethod: http.MethodPost,
+			name:           "negative test #5 - unknown type of metric",
+			passedJSONBody: `{"id": "Alloc", "type": "otherType", "value": 9999999}`,
+			route:          "/update/",
+			httpMethod:     http.MethodPost,
 			want: want{
 				code:        http.StatusBadRequest,
-				contentType: "text/plain",
+				contentType: "application/json",
 			},
 		},
 		{
-			name:       "negative test #6 - wrong value type",
-			route:      "/update/otherType/Alloc/wrongValue",
-			httpMethod: http.MethodPost,
+			name:           "negative test #6 - wrong value type",
+			passedJSONBody: `{"id": "Alloc", "type": "gauge", "value": "wrongValue"}`,
+			route:          "/update/",
+			httpMethod:     http.MethodPost,
 			want: want{
 				code:        http.StatusBadRequest,
-				contentType: "text/plain",
+				contentType: "application/json",
 			},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			res, _ := testRequest(t, ts, test.httpMethod, test.route)
-			defer res.Body.Close()
+			response, responseBody := testRequest(t, ts, test.httpMethod, test.route, strings.NewReader(test.passedJSONBody))
+			defer response.Body.Close()
 
-			// check if status code is correct
-			assert.Equal(t, test.want.code, res.StatusCode)
-			assert.Equal(t, test.want.contentType, res.Header.Get("Content-Type"))
+			// check HTTP status code and content type
+			assert.Equal(t, test.want.code, response.StatusCode)
+			assert.Equal(t, test.want.contentType, response.Header.Get("Content-Type"))
+
+			// if status is 200 - check passed metric in http body
+			if response.StatusCode == http.StatusOK {
+				var receivedMetric models.Metrics
+				jsonDecodingError := json.Unmarshal([]byte(responseBody), &receivedMetric)
+				assert.NoError(t, jsonDecodingError)
+				assert.True(t, areMetricsEqual(test.want.metric, receivedMetric))
+			}
 		})
 	}
 }
@@ -142,8 +162,8 @@ func mValue(v float64) *float64 {
 }
 
 // testRequest from Yandex.Practicum
-func testRequest(t *testing.T, ts *httptest.Server, method, path string) (*http.Response, string) {
-	req, err := http.NewRequest(method, ts.URL+path, nil)
+func testRequest(t *testing.T, ts *httptest.Server, method, path string, body io.Reader) (*http.Response, string) {
+	req, err := http.NewRequest(method, ts.URL+path, body)
 	require.NoError(t, err)
 
 	resp, err := ts.Client().Do(req)
@@ -154,4 +174,13 @@ func testRequest(t *testing.T, ts *httptest.Server, method, path string) (*http.
 	require.NoError(t, err)
 
 	return resp, string(respBody)
+}
+
+func areMetricsEqual(expected, actual models.Metrics) bool {
+	if expected.MType == models.Gauge {
+		return expected.ID == actual.ID && expected.MType == actual.MType && *expected.Value == *actual.Value
+	} else {
+		return expected.ID == actual.ID && expected.MType == actual.MType && *expected.Delta == *actual.Delta
+	}
+
 }

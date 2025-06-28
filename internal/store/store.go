@@ -21,42 +21,42 @@ func NewMemStorage() *MemStorage {
 	return &MemStorage{Memory: make(map[string]models.Metrics)}
 }
 
-func (m *MemStorage) AddCounter(metrics models.Metrics) (models.Metrics, error) {
-	if metrics.MType != models.Counter {
+func (m *MemStorage) AddCounter(metric models.Metrics) (models.Metrics, error) {
+	if metric.MType != models.Counter {
 		return models.Metrics{}, errors.New("metric type is not `counter`")
 	}
 
-	val, ok := m.Memory[metrics.ID]
+	val, ok := m.Memory[metric.ID]
 	// if metric name exists in storage - apply Counter logic
 	if ok {
-		newDelta := *val.Delta + *metrics.Delta
+		newDelta := *val.Delta + *metric.Delta
 		val.Delta = &newDelta
 
-		m.Memory[metrics.ID] = val
-	} else {
-		// if metric name doesn't exist - add it
-		m.Memory[metrics.ID] = metrics
+		m.Memory[metric.ID] = val
+		return val, nil
 	}
 
-	return models.Metrics{}, nil
+	// if metric name doesn't exist - add it
+	m.Memory[metric.ID] = metric
+	return metric, nil
 }
 
-func (m *MemStorage) UpdateGauge(metrics models.Metrics) (models.Metrics, error) {
-	if metrics.MType != models.Gauge {
+func (m *MemStorage) UpdateGauge(metric models.Metrics) (models.Metrics, error) {
+	if metric.MType != models.Gauge {
 		return models.Metrics{}, errors.New("metric type is not `gauge`")
 	}
 
-	val, ok := m.Memory[metrics.ID]
+	val, ok := m.Memory[metric.ID]
 	// if metric name exists in storage - apply Gauge logic
 	if ok {
-		val.Value = metrics.Value
-		m.Memory[metrics.ID] = val
-	} else {
-		// if metric name doesn't exist - add it
-		m.Memory[metrics.ID] = metrics
+		val.Value = metric.Value
+		m.Memory[metric.ID] = val
+		return val, nil
 	}
 
-	return models.Metrics{}, nil
+	// if metric name doesn't exist - add it
+	m.Memory[metric.ID] = metric
+	return metric, nil
 }
 
 func (m *MemStorage) GetMetricByNameAndType(metricName string, metricType string) (models.Metrics, bool) {

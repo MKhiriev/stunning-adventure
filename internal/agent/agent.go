@@ -3,8 +3,10 @@ package agent
 import (
 	"errors"
 	"fmt"
+	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/models"
 	"github.com/go-resty/resty/v2"
+	"log"
 	"math/rand/v2"
 	"net/http"
 	"runtime"
@@ -22,15 +24,15 @@ type MetricsAgent struct {
 	PollInterval   int64
 }
 
-func NewMetricsAgent(serverAddress string, route string, reportInterval, pollInterval int64) *MetricsAgent {
+func NewMetricsAgent(route string, cfg *config.AgentConfig) *MetricsAgent {
 	return &MetricsAgent{
-		ServerAddress:  "http://" + serverAddress,
+		ServerAddress:  "http://" + cfg.ServerAddress,
 		Route:          route,
 		Client:         resty.New(),
 		Memory:         NewStorage(),
 		PollCount:      0,
-		ReportInterval: reportInterval,
-		PollInterval:   pollInterval,
+		ReportInterval: cfg.ReportInterval,
+		PollInterval:   cfg.PollInterval,
 	}
 }
 
@@ -54,17 +56,15 @@ func (m *MetricsAgent) SendMetrics() error {
 		return errors.New("no metrics are passed")
 	}
 
+	route := fmt.Sprintf("%s/%s", m.ServerAddress, m.Route)
+	log.Println(route)
 	// send every metric retrieved from memory
 	for _, metric := range allMetrics {
-		// construct route based on metric's type
-		route, err := m.getRoute(metric)
-		if err != nil {
-			return err
-		}
-
 		response, err := m.Client.R().
-			SetHeader("Content-Type", "text/plain").
+			SetHeader("Content-Type", "application/json").
+			SetBody(metric).
 			Post(route)
+
 		if err != nil {
 			return err
 		}
@@ -133,6 +133,13 @@ func (m *MetricsAgent) getSliceOfMetrics(memStats runtime.MemStats) []models.Met
 	}
 }
 
+// getRoute constructs a route that consists of:
+//   - server address: points where is metric server is located. Default format: `<IP_address>:<port>`
+//   - route: specific route for updating metric's value. Default: `update/`
+//   - metric type: models.Counter or models.Gauge
+//   - metric value: *int64(Delta) or *float64(Value)
+//
+// Deprecated: now we send metrics via HTTP-Body in JSON format. No need to construct a route for every update.
 func (m *MetricsAgent) getRoute(metric models.Metrics) (string, error) {
 	if metric.MType == models.Counter {
 		// check if Counter's Delta is not nil

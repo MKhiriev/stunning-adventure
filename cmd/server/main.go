@@ -14,7 +14,7 @@ func main() {
 
 	handler := handlers.NewHandler(log)
 	myServer := new(server.Server)
-	err := myServer.ServerRun(handler.Init(), cfg.ServerAddress)
+	err := myServer.ServerRun(handler.Init(), cfg)
 	log.Fatal().Err(err)
 }
 
