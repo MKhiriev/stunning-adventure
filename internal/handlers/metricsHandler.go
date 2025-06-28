@@ -99,26 +99,21 @@ func (h *Handler) SaveMetric(w http.ResponseWriter, metric models.Metrics) {
 }
 
 func (h *Handler) GetMetricValue(w http.ResponseWriter, r *http.Request) {
-	w.Header().Add("Content-Type", "application/json")
+	w.Header().Add("Content-Type", "text/plain")
+	metricType := chi.URLParam(r, "metricType")
+	metricName := chi.URLParam(r, "metricName")
 
-	// get models.Metrics from HTTP Body
-	requestedMetric := models.Metrics{}
-	if err := json.NewDecoder(r.Body).Decode(&requestedMetric); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	if requestedMetric.ID == "" {
+	if metricName == "" {
 		w.WriteHeader(http.StatusNotFound)
 	}
 
 	metrics := []string{models.Gauge, models.Counter}
-	if !slices.Contains(metrics, requestedMetric.MType) {
+	if !slices.Contains(metrics, metricType) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	metric, isMetricFound := h.MemStorage.GetMetricByNameAndType(requestedMetric.ID, requestedMetric.MType)
+	metric, isMetricFound := h.MemStorage.GetMetricByNameAndType(metricName, metricType)
 
 	// if metric is present
 	if isMetricFound {
