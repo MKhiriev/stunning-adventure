@@ -55,13 +55,10 @@ func (m *MetricsAgent) SendMetrics() error {
 		return errors.New("no metrics are passed")
 	}
 
+	route := fmt.Sprintf("%s/%s/", m.ServerAddress, m.Route)
 	// send every metric retrieved from memory
 	for _, metric := range allMetrics {
 		// construct route based on metric's type
-		route, err := m.getRoute(metric)
-		if err != nil {
-			return err
-		}
 
 		response, err := m.Client.R().
 			SetHeader("Content-Type", "application/json").
