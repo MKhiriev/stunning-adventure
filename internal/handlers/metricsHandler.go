@@ -151,10 +151,18 @@ func (h *Handler) JSONGetMetricValue(w http.ResponseWriter, r *http.Request) {
 
 	// if metric is present
 	if isMetricFound {
+		// convert saved metric to JSON
+		var savedMetricJSON []byte
+		savedMetricJSON, err := json.Marshal(&metric)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
+			return
+		}
+
+		// return saved metric
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(
-			h.getValueFromMetric(metric),
-		))
+		w.Write(savedMetricJSON)
 	} else {
 		// if not present - return not found
 		w.WriteHeader(http.StatusNotFound)

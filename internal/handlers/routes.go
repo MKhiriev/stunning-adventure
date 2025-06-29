@@ -24,10 +24,14 @@ func (h *Handler) Init() *chi.Mux {
 
 	router.Use(middleware.Recoverer, h.WithLogging)
 
-	router.Post("/update/{metricType}/{metricName}/{metricValue}", h.MetricHandler)
-	router.Get("/value/{metricType}/{metricName}", h.GetMetricValue)
-	router.Post("/update/", h.JSONMetricHandler)
-	router.Post("/value/", h.JSONGetMetricValue)
+	router.Route("/update", func(r chi.Router) {
+		r.Post("/", h.JSONMetricHandler)
+		r.Post("/{metricType}/{metricName}/{metricValue}", h.MetricHandler)
+	})
+	router.Route("/value", func(r chi.Router) {
+		r.Post("/", h.JSONGetMetricValue)
+		r.Get("/{metricType}/{metricName}", h.GetMetricValue)
+	})
 	router.Get("/", h.GetAllMetrics)
 
 	router.MethodNotAllowed(CheckHTTPMethod(router))
