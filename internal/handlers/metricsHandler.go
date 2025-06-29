@@ -149,23 +149,24 @@ func (h *Handler) JSONGetMetricValue(w http.ResponseWriter, r *http.Request) {
 
 	metric, isMetricFound := h.MemStorage.GetMetricByNameAndType(requestedMetric.ID, requestedMetric.MType)
 
+	// convert saved metric to JSON
+	var savedMetricJSON []byte
+	savedMetricJSON, err := json.Marshal(&metric)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
 	// if metric is present
 	if isMetricFound {
-		// convert saved metric to JSON
-		var savedMetricJSON []byte
-		savedMetricJSON, err := json.Marshal(&metric)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-			return
-		}
-
 		// return saved metric
 		w.WriteHeader(http.StatusOK)
 		w.Write(savedMetricJSON)
 	} else {
-		// if not present - return not found
+		// if not present - return not found and empty metric
 		w.WriteHeader(http.StatusNotFound)
+		w.Write(savedMetricJSON)
 	}
 }
 

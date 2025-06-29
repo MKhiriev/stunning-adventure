@@ -68,9 +68,27 @@ func (m *MemStorage) GetMetricByNameAndType(metricName string, metricType string
 		return models.Metrics{}, false
 	}
 
-	return models.Metrics{}, false
+	return emptyMetric(metricName, metricType), false
 }
 
 func (m *MemStorage) GetAllMetrics() []models.Metrics {
 	return slices.Collect(maps.Values(m.Memory))
+}
+
+func emptyMetric(metricName string, metricType string) models.Metrics {
+	if metricType == models.Gauge {
+		return models.Metrics{ID: metricName, MType: metricType, Value: emptyValue()}
+	} else {
+		return models.Metrics{ID: metricName, MType: metricType, Delta: emptyDelta()}
+	}
+}
+
+func emptyValue() *float64 {
+	var v float64
+	return &v
+}
+
+func emptyDelta() *int64 {
+	var d int64
+	return &d
 }
