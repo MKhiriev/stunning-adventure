@@ -147,7 +147,7 @@ func (h *Handler) JSONGetMetricValue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	metric, isMetricFound := h.MemStorage.GetMetricByNameAndType(requestedMetric.ID, requestedMetric.MType)
+	metric, _ := h.MemStorage.GetMetricByNameAndType(requestedMetric.ID, requestedMetric.MType)
 
 	// convert saved metric to JSON
 	var savedMetricJSON []byte
@@ -158,15 +158,8 @@ func (h *Handler) JSONGetMetricValue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// if metric is present
-	if isMetricFound {
-		// return saved metric
-		w.WriteHeader(http.StatusOK)
-		w.Write(savedMetricJSON)
-	} else {
-		// if not present - return not found and empty metric
-		w.Write(savedMetricJSON)
-	}
+	w.WriteHeader(http.StatusOK)
+	w.Write(savedMetricJSON)
 }
 
 func (h *Handler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
