@@ -27,7 +27,7 @@ func (c *AgentStorage) RefreshAllMetrics(metrics ...models.Metrics) {
 	}
 
 	// empty the memory
-	c.Flush()
+	// c.Flush()
 
 	// assign passed metrics to new map
 	for _, metric := range metrics {
