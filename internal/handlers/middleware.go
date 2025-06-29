@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"bytes"
 	"github.com/go-chi/chi/v5"
+	"io/ioutil"
 	"net/http"
 	"time"
 )
@@ -25,6 +27,10 @@ func (h *Handler) WithLogging(handler http.Handler) http.Handler {
 		uri := r.RequestURI
 		method := r.Method
 
+		buf, _ := ioutil.ReadAll(r.Body)
+		requestBody := string(buf)
+		r.Body = ioutil.NopCloser(bytes.NewBuffer(buf))
+
 		responseData := &responseData{
 			status: 0,
 			size:   0,
@@ -41,6 +47,7 @@ func (h *Handler) WithLogging(handler http.Handler) http.Handler {
 		h.Logger.Info().
 			Str("uri", uri).
 			Str("method", method).
+			RawJSON("body", []byte(requestBody)).
 			Int("status", responseData.status).
 			Dur("duration", duration).
 			Int("size", responseData.size).
