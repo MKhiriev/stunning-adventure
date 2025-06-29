@@ -165,7 +165,6 @@ func (h *Handler) JSONGetMetricValue(w http.ResponseWriter, r *http.Request) {
 		w.Write(savedMetricJSON)
 	} else {
 		// if not present - return not found and empty metric
-		w.WriteHeader(http.StatusNotFound)
 		w.Write(savedMetricJSON)
 	}
 }
