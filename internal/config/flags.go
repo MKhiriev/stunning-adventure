@@ -10,7 +10,7 @@ import (
 
 const (
 	defaultPollInterval   = int64(2)
-	defaultReportInterval = int64(10)
+	defaultReportInterval = int64(5)
 	defaultServerAddress  = "localhost:8080"
 )
 

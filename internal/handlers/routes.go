@@ -24,6 +24,8 @@ func (h *Handler) Init() *chi.Mux {
 
 	router.Use(middleware.Recoverer, h.WithLogging)
 
+	router.Post("/update/", h.UpdateMetricJSON)
+	router.Post("/value/", h.GetMetricJSON)
 	router.Post("/update/{metricType}/{metricName}/{metricValue}", h.MetricHandler)
 	router.Get("/value/{metricType}/{metricName}", h.GetMetricValue)
 	router.Get("/", h.GetAllMetrics)

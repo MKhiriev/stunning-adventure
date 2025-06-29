@@ -14,8 +14,7 @@ func main() {
 
 	handler := handlers.NewHandler(log)
 	myServer := new(server.Server)
-	err := myServer.ServerRun(handler.Init(), cfg.ServerAddress)
-	log.Fatal().Err(err)
+	myServer.ServerRun(handler.Init(), cfg.ServerAddress)
 }
 
 func Init() (*config.ServerConfig, *zerolog.Logger) {

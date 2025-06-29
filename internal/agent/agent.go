@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/MKhiriev/stunning-adventure/models"
 	"github.com/go-resty/resty/v2"
+	"log"
 	"math/rand/v2"
 	"net/http"
 	"runtime"
@@ -47,6 +48,35 @@ func (m *MetricsAgent) ReadMetrics() error {
 	return nil
 }
 
+func (m *MetricsAgent) SendMetricsJSON() error {
+	// get all metrics from memory
+	allMetrics := m.Memory.GetAllMetrics()
+	if len(allMetrics) == 0 {
+		return errors.New("no metrics are passed")
+	}
+
+	route := fmt.Sprintf("%s/%s/", m.ServerAddress, m.Route)
+	// send every metric retrieved from memory
+	for _, metric := range allMetrics {
+		//response, err := m.Client.R().
+		//	SetHeader("Content-Type", "application/json").
+		//	SetBody(metric).
+		//	Post(route)
+		response, err := resty.New().R().
+			SetHeader("Content-Type", "application/json").
+			SetBody(metric).
+			Post(route)
+
+		log.Printf("Route: `%s` Response Body: `%s`", route, string(response.Body()))
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (m *MetricsAgent) SendMetrics() error {
 	// get all metrics from memory
 	allMetrics := m.Memory.GetAllMetrics()
@@ -77,29 +107,46 @@ func (m *MetricsAgent) SendMetrics() error {
 }
 
 func (m *MetricsAgent) Run() error {
-	timeToSendMetrics := time.Now().Add(time.Duration(m.ReportInterval) * time.Second)
-	for {
-		// Read Metrics
-		if err := m.ReadMetrics(); err != nil {
-			return err
-		}
-		// wait 2 seconds
-		time.Sleep(time.Duration(m.PollInterval) * time.Second)
+	var err error
 
-		thisMoment := time.Now()
-		// check if it's time to send metrics
-		if thisMoment.Equal(timeToSendMetrics) || thisMoment.After(timeToSendMetrics) {
-			// Send Metrics
-			if err := m.SendMetrics(); err != nil {
-				return err
-			}
-			// set time to send metrics to the server
-			timeToSendMetrics = time.Now().Add(time.Duration(m.ReportInterval) * time.Second)
-		}
-	}
+	runWithTicker(func() {
+		err = m.ReadMetrics()
+	}, time.Duration(m.PollInterval)*time.Second)
+
+	runWithTicker(func() {
+		err = m.SendMetrics()
+	}, time.Duration(m.ReportInterval)*time.Second)
+
+	select {} // block main routine forever
+
+	return err
 }
 
+//func (m *MetricsAgent) Run() error {
+//	timeToSendMetrics := time.Now().Add(time.Duration(m.ReportInterval) * time.Second)
+//	for {
+//		// Read Metrics
+//		if err := m.ReadMetrics(); err != nil {
+//			return err
+//		}
+//		// wait 2 seconds
+//		time.Sleep(time.Duration(m.PollInterval) * time.Second)
+//
+//		thisMoment := time.Now()
+//		// check if it's time to send metrics
+//		if thisMoment.Equal(timeToSendMetrics) || thisMoment.After(timeToSendMetrics) {
+//			// Send Metrics
+//			if err := m.SendMetricsJSON(); err != nil {
+//				return err
+//			}
+//			// set time to send metrics to the server
+//			timeToSendMetrics = time.Now().Add(time.Duration(m.ReportInterval) * time.Second)
+//		}
+//	}
+//}
+
 func (m *MetricsAgent) getSliceOfMetrics(memStats runtime.MemStats) []models.Metrics {
+	m.PollCount += 1
 	return []models.Metrics{
 		gaugeMetric("Alloc", float64(memStats.Alloc)),
 		gaugeMetric("BuckHashSys", float64(memStats.BuckHashSys)),
@@ -128,7 +175,7 @@ func (m *MetricsAgent) getSliceOfMetrics(memStats runtime.MemStats) []models.Met
 		gaugeMetric("StackSys", float64(memStats.StackSys)),
 		gaugeMetric("Sys", float64(memStats.Sys)),
 		gaugeMetric("TotalAlloc", float64(memStats.TotalAlloc)),
-		counterMetric("PollCount", m.PollCount+1),
+		counterMetric("PollCount", m.PollCount),
 		gaugeMetric("RandomValue", rand.Float64()),
 	}
 }
@@ -155,6 +202,16 @@ func (m *MetricsAgent) getRoute(metric models.Metrics) (string, error) {
 	}
 
 	return "", errors.New("error occurred during route construction")
+}
+
+func runWithTicker(fn func(), duration time.Duration) {
+	ticker := time.NewTicker(duration)
+
+	go func() {
+		for range ticker.C {
+			fn()
+		}
+	}()
 }
 
 func gaugeMetric(name string, value float64) models.Metrics {
