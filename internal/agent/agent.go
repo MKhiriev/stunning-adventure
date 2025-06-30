@@ -116,10 +116,11 @@ func (m *MetricsAgent) Run() error {
 	runWithTicker(func() {
 		err = m.SendMetrics()
 	}, time.Duration(m.ReportInterval)*time.Second)
+	if err != nil {
+		return err
+	}
 
 	select {} // block main routine forever
-
-	return err
 }
 
 //func (m *MetricsAgent) Run() error {
