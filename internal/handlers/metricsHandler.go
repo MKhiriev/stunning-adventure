@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"github.com/MKhiriev/stunning-adventure/models"
 	"github.com/go-chi/chi/v5"
 	"html/template"
@@ -8,6 +9,96 @@ import (
 	"slices"
 	"strconv"
 )
+
+func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
+	h.Logger.Info().Msg("h.UpdateMetricJSON() was called")
+	allowedMetricTypes := []string{models.Gauge, models.Counter}
+	var metricFromBody models.Metrics
+
+	// 1. Get JSON from the body
+	if err := json.NewDecoder(r.Body).Decode(&metricFromBody); err != nil {
+		http.Error(w, "Invalid JSON was passed", http.StatusBadRequest)
+		return
+	}
+
+	// 2. Check if metric from JSON is valid => if not - StatusBadRequest
+	if metricFromBody.ID == "" || metricFromBody.MType == "" || !slices.Contains(allowedMetricTypes, metricFromBody.MType) {
+		http.Error(w, "Passed metric is not valid", http.StatusBadRequest)
+		return
+	}
+
+	// 3. Update metric's value based on it's type - first you need to do it ugly
+	if metricFromBody.MType == models.Gauge {
+		_, err := h.MemStorage.UpdateGauge(metricFromBody)
+		if err != nil {
+			http.Error(w, "error occured during gauge metric update", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		_, err := h.MemStorage.AddCounter(metricFromBody)
+		if err != nil {
+			http.Error(w, "error occured during gauge metric update", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// 4. Set Content type to `application/json`
+	w.Header().Set("Content-Type", "application/json")
+	// 5. marshal in JSON saved metric
+	savedMetricJSON, err := json.Marshal(metricFromBody)
+	if err != nil {
+		http.Error(w, "error occured during marshalling saved metric to JSON", http.StatusInternalServerError)
+		return
+	}
+
+	// 6. return updated metric
+	w.WriteHeader(http.StatusOK)
+	w.Write(savedMetricJSON)
+}
+
+func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
+	h.Logger.Info().Msg("h.GetMetricJSON() was called")
+	w.Header().Set("Content-Type", "application/json")
+	allowedMetricTypes := []string{models.Gauge, models.Counter}
+	var metricFromBodyWithoutValue models.Metrics
+
+	// 1. Get JSON from the body
+	if err := json.NewDecoder(r.Body).Decode(&metricFromBodyWithoutValue); err != nil {
+		http.Error(w, "Invalid JSON was passed", http.StatusBadRequest)
+		return
+	}
+
+	// 2. Check if metric from JSON is valid => if not - StatusBadRequest
+	if metricFromBodyWithoutValue.ID == "" || metricFromBodyWithoutValue.MType == "" || !slices.Contains(allowedMetricTypes, metricFromBodyWithoutValue.MType) {
+		http.Error(w, "Passed metric is not valid", http.StatusBadRequest)
+		return
+	}
+
+	// 3. Find metric in memory
+	foundMetric, ok := h.MemStorage.GetMetricByNameAndType(metricFromBodyWithoutValue.ID, metricFromBodyWithoutValue.MType)
+
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+	}
+	if metricFromBodyWithoutValue.MType == models.Gauge && foundMetric.Value != nil {
+		metricFromBodyWithoutValue.Value = foundMetric.Value
+		w.WriteHeader(http.StatusOK)
+	}
+	if metricFromBodyWithoutValue.MType == models.Counter && foundMetric.Delta != nil {
+		metricFromBodyWithoutValue.Delta = foundMetric.Delta
+		w.WriteHeader(http.StatusOK)
+	}
+
+	// 4. Marshal
+	foundMetricJSON, err := json.Marshal(metricFromBodyWithoutValue)
+	if err != nil {
+		http.Error(w, "error occured during marshalling saved metric to JSON", http.StatusInternalServerError)
+		return
+	}
+
+	// 5. Set header and status code
+	w.Write(foundMetricJSON)
+}
 
 func (h *Handler) MetricHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "text/plain")
