@@ -9,9 +9,12 @@ import (
 )
 
 const (
-	defaultPollInterval   = int64(2)
-	defaultReportInterval = int64(5)
-	defaultServerAddress  = "localhost:8080"
+	defaultPollInterval    = int64(2)
+	defaultReportInterval  = int64(5)
+	defaultServerAddress   = "localhost:8080"
+	defaultStoreInterval   = int64(300)
+	defaultFileStoragePath = "internal/store"
+	defaultRestoreValue    = false
 )
 
 type NetAddress struct {
@@ -19,15 +22,18 @@ type NetAddress struct {
 	Port int
 }
 
-func ParseServerFlags() (netAddress string) {
+func ParseServerFlags() (netAddress string, storeInterval int64, fileStoragePath string, restore bool) {
 	serverAddress := NetAddress{}
 	_ = flag.Value(&serverAddress)
 
 	flag.Var(&serverAddress, "a", "Net address host:port")
+	flag.Int64Var(&storeInterval, "i", defaultStoreInterval, "Store interval in seconds")
+	flag.StringVar(&fileStoragePath, "f", defaultFileStoragePath, "Storage file path string")
+	flag.BoolVar(&restore, "r", defaultRestoreValue, "Boolean - restore previous metrics from file")
 
 	flag.Parse()
 
-	return serverAddress.String()
+	return serverAddress.String(), storeInterval, fileStoragePath, restore
 }
 
 func ParseAgentFlags() (netAddress string, pollInterval int64, reportInterval int64) {
