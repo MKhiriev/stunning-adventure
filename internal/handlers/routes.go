@@ -22,7 +22,7 @@ func NewHandler(logger *zerolog.Logger) *Handler {
 func (h *Handler) Init() *chi.Mux {
 	router := chi.NewRouter()
 
-	router.Use(middleware.Recoverer, h.WithLogging)
+	router.Use(middleware.Recoverer, h.WithLogging, WithGzipCompression)
 
 	router.Post("/update/", h.UpdateMetricJSON)
 	router.Post("/value/", h.GetMetricJSON)

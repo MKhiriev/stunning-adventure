@@ -225,6 +225,7 @@ func (h *Handler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 		allHTMLMetrics[idx] = HTMLMetric{ID: metric.ID, MType: metric.MType, Value: h.getValueFromMetric(metric)}
 	}
 
+	w.Header().Set("Content-Type", "text/html")
 	err = html.Execute(w, allHTMLMetrics)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

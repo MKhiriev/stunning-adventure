@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/MKhiriev/stunning-adventure/models"
 	"github.com/go-resty/resty/v2"
-	"log"
 	"math/rand/v2"
 	"net/http"
 	"runtime"
@@ -58,16 +57,13 @@ func (m *MetricsAgent) SendMetricsJSON() error {
 	route := fmt.Sprintf("%s/%s/", m.ServerAddress, m.Route)
 	// send every metric retrieved from memory
 	for _, metric := range allMetrics {
-		//response, err := m.Client.R().
-		//	SetHeader("Content-Type", "application/json").
-		//	SetBody(metric).
-		//	Post(route)
-		response, err := resty.New().R().
-			SetHeader("Content-Type", "application/json").
+		_, err := resty.New().R().
+			SetHeaders(map[string]string{
+				"Content-Type":     "application/json",
+				"Content-Encoding": "gzip",
+			}).
 			SetBody(metric).
 			Post(route)
-
-		log.Printf("Route: `%s` Response Body: `%s`", route, string(response.Body()))
 
 		if err != nil {
 			return err
@@ -122,29 +118,6 @@ func (m *MetricsAgent) Run() error {
 
 	select {} // block main routine forever
 }
-
-//func (m *MetricsAgent) Run() error {
-//	timeToSendMetrics := time.Now().Add(time.Duration(m.ReportInterval) * time.Second)
-//	for {
-//		// Read Metrics
-//		if err := m.ReadMetrics(); err != nil {
-//			return err
-//		}
-//		// wait 2 seconds
-//		time.Sleep(time.Duration(m.PollInterval) * time.Second)
-//
-//		thisMoment := time.Now()
-//		// check if it's time to send metrics
-//		if thisMoment.Equal(timeToSendMetrics) || thisMoment.After(timeToSendMetrics) {
-//			// Send Metrics
-//			if err := m.SendMetricsJSON(); err != nil {
-//				return err
-//			}
-//			// set time to send metrics to the server
-//			timeToSendMetrics = time.Now().Add(time.Duration(m.ReportInterval) * time.Second)
-//		}
-//	}
-//}
 
 func (m *MetricsAgent) getSliceOfMetrics(memStats runtime.MemStats) []models.Metrics {
 	m.PollCount += 1
