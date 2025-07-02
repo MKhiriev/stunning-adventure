@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"runtime"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -20,6 +21,7 @@ type MetricsAgent struct {
 	PollCount      int64
 	ReportInterval int64
 	PollInterval   int64
+	mu             sync.RWMutex
 }
 
 func NewMetricsAgent(serverAddress string, route string, reportInterval, pollInterval int64) *MetricsAgent {
@@ -106,10 +108,14 @@ func (m *MetricsAgent) Run() error {
 	var err error
 
 	runWithTicker(func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
 		err = m.ReadMetrics()
 	}, time.Duration(m.PollInterval)*time.Second)
 
 	runWithTicker(func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
 		err = m.SendMetrics()
 	}, time.Duration(m.ReportInterval)*time.Second)
 	if err != nil {

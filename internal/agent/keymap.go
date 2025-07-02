@@ -39,3 +39,7 @@ func (c *AgentStorage) RefreshAllMetrics(metrics ...models.Metrics) {
 func (c *AgentStorage) Flush() {
 	c.Metrics = make(map[string]models.Metrics)
 }
+
+func (c *AgentStorage) GetMetric(metricId string) models.Metrics {
+	return models.Metrics{}
+}
