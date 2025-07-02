@@ -14,7 +14,7 @@ type MetricsStorage interface {
 	GetAllMetrics() []models.Metrics
 }
 type MemStorage struct {
-	Memory map[string]models.Metrics
+	Memory map[string]models.Metrics `json:"metrics"`
 }
 
 func NewMemStorage() *MemStorage {
