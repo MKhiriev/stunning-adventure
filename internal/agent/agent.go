@@ -1,6 +1,9 @@
 package agent
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/MKhiriev/stunning-adventure/internal/utils"
@@ -60,12 +63,17 @@ func (m *MetricsAgent) SendMetricsJSON() error {
 	route := fmt.Sprintf("%s/%s/", m.ServerAddress, m.Route)
 	// send every metric retrieved from memory
 	for _, metric := range allMetrics {
+		compressedMetric, compressionErr := gzipEncodeJSON(metric)
+		if compressionErr != nil {
+			return fmt.Errorf("error during gzip metric compression: %s", compressionErr.Error())
+		}
+
 		_, err := resty.New().R().
 			SetHeaders(map[string]string{
 				"Content-Type":     "application/json",
 				"Content-Encoding": "gzip",
 			}).
-			SetBody(metric).
+			SetBody(compressedMetric).
 			Post(route)
 
 		if err != nil {
@@ -117,7 +125,7 @@ func (m *MetricsAgent) Run() error {
 	utils.RunWithTicker(func() {
 		m.mu.Lock()
 		defer m.mu.Unlock()
-		err = m.SendMetrics()
+		err = m.SendMetricsJSON()
 	}, time.Duration(m.ReportInterval)*time.Second)
 	if err != nil {
 		return err
@@ -199,4 +207,21 @@ func counterMetric(name string, value int64) models.Metrics {
 		MType: models.Counter,
 		Delta: &value,
 	}
+}
+
+func gzipEncodeJSON(data interface{}) ([]byte, error) {
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	encoder := json.NewEncoder(gz)
+
+	if err := encoder.Encode(data); err != nil {
+		gz.Close()
+		return nil, err
+	}
+
+	if err := gz.Close(); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
 }

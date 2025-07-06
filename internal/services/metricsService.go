@@ -1,4 +1,4 @@
-package service
+package services
 
 import (
 	"github.com/MKhiriev/stunning-adventure/internal/store"
@@ -12,7 +12,7 @@ type MetricsService interface {
 	UpdateGauge(models.Metrics) (models.Metrics, error)
 	GetMetricByNameAndType(metricName string, metricType string) (models.Metrics, bool)
 	GetAllMetrics() []models.Metrics
-	SaveMetricsToFile([]models.Metrics) error
+	SaveMetricsToFile() error
 	LoadMetricsFromFile() ([]models.Metrics, error)
 }
 
@@ -61,15 +61,18 @@ func (s *ServerMetricsService) GetAllMetrics() []models.Metrics {
 }
 
 func (s *ServerMetricsService) SaveMetricsToFile(metrics []models.Metrics) error {
-	var err error
-
-	utils.RunWithTicker(func() {
-		err = s.FileStorage.SaveMetrics(metrics)
-	}, time.Duration(s.StoreInterval)*time.Second)
-
-	return err
+	return s.FileStorage.SaveMetrics(metrics)
 }
 
 func (s *ServerMetricsService) LoadMetricsFromFile() ([]models.Metrics, error) {
 	return s.FileStorage.LoadMetrics()
+}
+
+func (s *ServerMetricsService) SaveMetricsToFilePeriodically() {
+	utils.RunWithTicker(func() {
+		metrics := s.GetAllMetrics()
+		if metrics != nil {
+			_ = s.FileStorage.SaveMetrics(metrics)
+		}
+	}, time.Duration(s.StoreInterval)*time.Second)
 }

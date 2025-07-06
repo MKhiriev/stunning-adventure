@@ -17,17 +17,17 @@ type FileStorage struct {
 	filePath string
 }
 
-func NewFileStorage(fileName, fileStoragePath string) (*FileStorage, error) {
+func NewFileStorage(fileName, fileStoragePath string) *FileStorage {
 	filePath := path.Join(fileStoragePath, fileName)
-	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
-		return nil, err
+		return nil
 	}
 
 	return &FileStorage{
 		File:     file,
 		filePath: filePath,
-	}, nil
+	}
 }
 
 func (fs *FileStorage) SaveMetrics(allMetrics []models.Metrics) error {
@@ -46,10 +46,10 @@ func (fs *FileStorage) LoadMetrics() ([]models.Metrics, error) {
 		return nil, err
 	}
 
-	var loadedMetrics []models.Metrics
+	var loadedMetrics [][]models.Metrics
 	if err = json.Unmarshal(data, &loadedMetrics); err != nil {
 		return nil, err
 	}
 
-	return loadedMetrics, nil
+	return loadedMetrics[len(loadedMetrics)-1], nil
 }

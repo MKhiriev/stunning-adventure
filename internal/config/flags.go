@@ -12,7 +12,7 @@ const (
 	defaultPollInterval    = int64(2)
 	defaultReportInterval  = int64(5)
 	defaultServerAddress   = "localhost:8080"
-	defaultStoreInterval   = int64(300)
+	defaultStoreInterval   = int64(10)
 	defaultFileStoragePath = "internal/store"
 	defaultRestoreValue    = false
 )

@@ -11,7 +11,6 @@ import (
 )
 
 func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
-	h.Logger.Info().Msg("h.UpdateMetricJSON() was called")
 	allowedMetricTypes := []string{models.Gauge, models.Counter}
 	var metricFromBody models.Metrics
 
@@ -27,19 +26,25 @@ func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 3. Update metric's value based on it's type - first you need to do it ugly
+	// 3. Update metric's value based on it's type
 	if metricFromBody.MType == models.Gauge {
-		_, err := h.MemStorage.UpdateGauge(metricFromBody)
+		_, err := h.MetricsService.UpdateGauge(metricFromBody)
 		if err != nil {
 			http.Error(w, "error occured during gauge metric update", http.StatusInternalServerError)
 			return
 		}
 	} else {
-		_, err := h.MemStorage.AddCounter(metricFromBody)
+		_, err := h.MetricsService.AddCounter(metricFromBody)
 		if err != nil {
 			http.Error(w, "error occured during gauge metric update", http.StatusInternalServerError)
 			return
 		}
+	}
+
+	err := h.MetricsService.SaveMetricsToFile(h.MetricsService.GetAllMetrics())
+	if err != nil {
+		http.Error(w, "error occured during gauge metric update", http.StatusInternalServerError)
+		return
 	}
 
 	// 4. Set Content type to `application/json`
@@ -75,7 +80,7 @@ func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 3. Find metric in memory
-	foundMetric, ok := h.MemStorage.GetMetricByNameAndType(metricFromBodyWithoutValue.ID, metricFromBodyWithoutValue.MType)
+	foundMetric, ok := h.MetricsService.GetMetricByNameAndType(metricFromBodyWithoutValue.ID, metricFromBodyWithoutValue.MType)
 
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
@@ -144,7 +149,7 @@ func (h *Handler) HandleGauge(w http.ResponseWriter, metricValue string, metricN
 		Value: &gaugeValue,
 	}
 
-	_, err := h.MemStorage.UpdateGauge(gaugeMetricToSave)
+	_, err := h.MetricsService.UpdateGauge(gaugeMetricToSave)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
@@ -168,7 +173,7 @@ func (h *Handler) HandleCounter(w http.ResponseWriter, metricValue string, metri
 		Delta: &counterValue,
 	}
 
-	_, err := h.MemStorage.AddCounter(counterMetricToSave)
+	_, err := h.MetricsService.AddCounter(counterMetricToSave)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
@@ -193,7 +198,7 @@ func (h *Handler) GetMetricValue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	metric, isMetricFound := h.MemStorage.GetMetricByNameAndType(metricName, metricType)
+	metric, isMetricFound := h.MetricsService.GetMetricByNameAndType(metricName, metricType)
 
 	// if metric is present
 	if isMetricFound {
@@ -213,7 +218,7 @@ func (h *Handler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	allMetrics := h.MemStorage.GetAllMetrics()
+	allMetrics := h.MetricsService.GetAllMetrics()
 	type HTMLMetric struct {
 		ID    string
 		MType string
