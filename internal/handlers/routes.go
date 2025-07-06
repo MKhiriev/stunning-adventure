@@ -8,14 +8,16 @@ import (
 )
 
 type Handler struct {
-	MemStorage *store.MemStorage
-	Logger     *zerolog.Logger
+	MemStorage  *store.MemStorage
+	FileStorage *store.FileStorage
+	Logger      *zerolog.Logger
 }
 
-func NewHandler(logger *zerolog.Logger) *Handler {
+func NewHandler(memStorage *store.MemStorage, fileStorage *store.FileStorage, logger *zerolog.Logger) *Handler {
 	return &Handler{
-		MemStorage: store.NewMemStorage(),
-		Logger:     logger,
+		MemStorage:  memStorage,
+		FileStorage: fileStorage,
+		Logger:      logger,
 	}
 }
 

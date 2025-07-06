@@ -12,10 +12,10 @@ type AgentConfig struct {
 }
 
 type ServerConfig struct {
-	ServerAddress   string `env:"ADDRESS"`
-	StoreInterval   int64  `env:"STORE_INTERVAL"`
-	FileStoragePath string `env:"FILE_STORAGE_PATH"`
-	Restore         bool   `env:"RESTORE"`
+	ServerAddress          string `env:"ADDRESS"`
+	StoreInterval          int64  `env:"STORE_INTERVAL"`
+	FileStoragePath        string `env:"FILE_STORAGE_PATH"`
+	RestoreMetricsFromFile bool   `env:"RESTORE"`
 }
 
 func GetAgentConfigs() *AgentConfig {
@@ -70,8 +70,8 @@ func GetServerConfigs() *ServerConfig {
 	if cfg.FileStoragePath == "" {
 		cfg.FileStoragePath = commandLineFileStoragePath
 	}
-	if cfg.Restore == false && commandLineRestore != false {
-		cfg.Restore = commandLineRestore
+	if cfg.RestoreMetricsFromFile == false && commandLineRestore != false {
+		cfg.RestoreMetricsFromFile = commandLineRestore
 	}
 
 	return cfg

@@ -4,6 +4,7 @@ import (
 	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/internal/handlers"
 	"github.com/MKhiriev/stunning-adventure/internal/server"
+	"github.com/MKhiriev/stunning-adventure/internal/store"
 	"github.com/rs/zerolog"
 	"os"
 )
@@ -12,7 +13,9 @@ func main() {
 	cfg, log := Init()
 	log.Info().Msg("Server started")
 
-	handler := handlers.NewHandler(log)
+	memStorage := store.NewMemStorage()
+	fileStorage := store.NewFileStorage(memStorage, cfg)
+	handler := handlers.NewHandler(memStorage, fileStorage, log)
 	myServer := new(server.Server)
 	myServer.ServerRun(handler.Init(), cfg.ServerAddress)
 }
