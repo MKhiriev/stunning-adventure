@@ -117,7 +117,7 @@ func (m *MetricsAgent) Run() error {
 	utils.RunWithTicker(func() {
 		m.mu.Lock()
 		defer m.mu.Unlock()
-		err = m.SendMetrics()
+		err = m.SendMetricsJSON()
 	}, time.Duration(m.ReportInterval)*time.Second)
 	if err != nil {
 		return err
