@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"github.com/MKhiriev/stunning-adventure/internal/config"
+	"github.com/MKhiriev/stunning-adventure/internal/store"
 	"github.com/MKhiriev/stunning-adventure/models"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -129,7 +131,16 @@ func TestGetValueFromMetric(t *testing.T) {
 
 func initHandler() *Handler {
 	logger := zerolog.New(os.Stdout).With().Logger()
-	return NewHandler(&logger)
+	cfg := &config.ServerConfig{
+		ServerAddress:          "localhost:8080",
+		StoreInterval:          300,
+		FileStoragePath:        "internal/store/metrics.log",
+		RestoreMetricsFromFile: false,
+	}
+	memStorage := store.NewMemStorage()
+	fileStorage := store.NewFileStorage(memStorage, cfg)
+
+	return NewHandler(memStorage, fileStorage, &logger)
 }
 
 func mDelta(v int) *int64 {
