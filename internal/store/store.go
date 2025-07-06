@@ -27,6 +27,8 @@ func (m *MemStorage) AddCounter(metrics models.Metrics) (models.Metrics, error) 
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
+	var result models.Metrics
+
 	if metrics.MType != models.Counter {
 		return models.Metrics{}, errors.New("metric type is not `counter`")
 	}
@@ -38,17 +40,21 @@ func (m *MemStorage) AddCounter(metrics models.Metrics) (models.Metrics, error) 
 		val.Delta = &newDelta
 
 		m.Memory[metrics.ID] = val
+		result = val
 	} else {
 		// if metric name doesn't exist - add it
 		m.Memory[metrics.ID] = metrics
+		result = metrics
 	}
 
-	return models.Metrics{}, nil
+	return result, nil
 }
 
 func (m *MemStorage) UpdateGauge(metrics models.Metrics) (models.Metrics, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+
+	var result models.Metrics
 
 	if metrics.MType != models.Gauge {
 		return models.Metrics{}, errors.New("metric type is not `gauge`")
@@ -59,12 +65,14 @@ func (m *MemStorage) UpdateGauge(metrics models.Metrics) (models.Metrics, error)
 	if ok {
 		val.Value = metrics.Value
 		m.Memory[metrics.ID] = val
+		result = val
 	} else {
 		// if metric name doesn't exist - add it
 		m.Memory[metrics.ID] = metrics
+		result = metrics
 	}
 
-	return models.Metrics{}, nil
+	return result, nil
 }
 
 func (m *MemStorage) GetMetricByNameAndType(metricName string, metricType string) (models.Metrics, bool) {
