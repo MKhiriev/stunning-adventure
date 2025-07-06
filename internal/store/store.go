@@ -5,6 +5,7 @@ import (
 	"github.com/MKhiriev/stunning-adventure/models"
 	"maps"
 	"slices"
+	"sync"
 )
 
 type MetricsStorage interface {
@@ -15,6 +16,7 @@ type MetricsStorage interface {
 }
 type MemStorage struct {
 	Memory map[string]models.Metrics
+	mu     sync.RWMutex
 }
 
 func NewMemStorage() *MemStorage {
@@ -22,6 +24,9 @@ func NewMemStorage() *MemStorage {
 }
 
 func (m *MemStorage) AddCounter(metrics models.Metrics) (models.Metrics, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	if metrics.MType != models.Counter {
 		return models.Metrics{}, errors.New("metric type is not `counter`")
 	}
@@ -42,6 +47,9 @@ func (m *MemStorage) AddCounter(metrics models.Metrics) (models.Metrics, error) 
 }
 
 func (m *MemStorage) UpdateGauge(metrics models.Metrics) (models.Metrics, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	if metrics.MType != models.Gauge {
 		return models.Metrics{}, errors.New("metric type is not `gauge`")
 	}
@@ -60,6 +68,9 @@ func (m *MemStorage) UpdateGauge(metrics models.Metrics) (models.Metrics, error)
 }
 
 func (m *MemStorage) GetMetricByNameAndType(metricName string, metricType string) (models.Metrics, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	foundMetric, ok := m.Memory[metricName]
 	if ok {
 		if foundMetric.MType == metricType {
@@ -72,5 +83,8 @@ func (m *MemStorage) GetMetricByNameAndType(metricName string, metricType string
 }
 
 func (m *MemStorage) GetAllMetrics() []models.Metrics {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	return slices.Collect(maps.Values(m.Memory))
 }

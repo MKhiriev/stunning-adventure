@@ -15,6 +15,7 @@ type MetricsFileStorage interface {
 type FileStorage struct {
 	File     *os.File
 	filePath string
+	*MemStorage
 }
 
 func NewFileStorage(fileName, fileStoragePath string) *FileStorage {
@@ -31,6 +32,9 @@ func NewFileStorage(fileName, fileStoragePath string) *FileStorage {
 }
 
 func (fs *FileStorage) SaveMetrics(allMetrics []models.Metrics) error {
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
+
 	jsonData, err := json.Marshal(allMetrics)
 	if err != nil {
 		return err
@@ -41,6 +45,9 @@ func (fs *FileStorage) SaveMetrics(allMetrics []models.Metrics) error {
 }
 
 func (fs *FileStorage) LoadMetrics() ([]models.Metrics, error) {
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
+
 	data, err := os.ReadFile(fs.filePath)
 	if err != nil {
 		return nil, err
