@@ -3,6 +3,7 @@ package agent
 import (
 	"errors"
 	"fmt"
+	"github.com/MKhiriev/stunning-adventure/internal/utils"
 	"github.com/MKhiriev/stunning-adventure/models"
 	"github.com/go-resty/resty/v2"
 	"math/rand/v2"
@@ -107,13 +108,13 @@ func (m *MetricsAgent) SendMetrics() error {
 func (m *MetricsAgent) Run() error {
 	var err error
 
-	runWithTicker(func() {
+	utils.RunWithTicker(func() {
 		m.mu.Lock()
 		defer m.mu.Unlock()
 		err = m.ReadMetrics()
 	}, time.Duration(m.PollInterval)*time.Second)
 
-	runWithTicker(func() {
+	utils.RunWithTicker(func() {
 		m.mu.Lock()
 		defer m.mu.Unlock()
 		err = m.SendMetrics()
@@ -182,16 +183,6 @@ func (m *MetricsAgent) getRoute(metric models.Metrics) (string, error) {
 	}
 
 	return "", errors.New("error occurred during route construction")
-}
-
-func runWithTicker(fn func(), duration time.Duration) {
-	ticker := time.NewTicker(duration)
-
-	go func() {
-		for range ticker.C {
-			fn()
-		}
-	}()
 }
 
 func gaugeMetric(name string, value float64) models.Metrics {
