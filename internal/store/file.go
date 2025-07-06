@@ -2,9 +2,9 @@ package store
 
 import (
 	"encoding/json"
+	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/models"
 	"os"
-	"path"
 )
 
 type MetricsFileStorage interface {
@@ -13,21 +13,14 @@ type MetricsFileStorage interface {
 }
 
 type FileStorage struct {
-	File     *os.File
-	filePath string
+	cfg *config.ServerConfig
 	*MemStorage
 }
 
-func NewFileStorage(fileName, fileStoragePath string) *FileStorage {
-	filePath := path.Join(fileStoragePath, fileName)
-	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		return nil
-	}
-
+func NewFileStorage(memStorage *MemStorage, cfg *config.ServerConfig) *FileStorage {
 	return &FileStorage{
-		File:     file,
-		filePath: filePath,
+		MemStorage: memStorage,
+		cfg:        cfg,
 	}
 }
 
@@ -40,23 +33,22 @@ func (fs *FileStorage) SaveMetrics(allMetrics []models.Metrics) error {
 		return err
 	}
 
-	_, err = fs.File.Write(jsonData)
-	return err
+	return os.WriteFile(fs.cfg.FileStoragePath, jsonData, 0644)
 }
 
 func (fs *FileStorage) LoadMetrics() ([]models.Metrics, error) {
 	fs.mu.RLock()
 	defer fs.mu.RUnlock()
 
-	data, err := os.ReadFile(fs.filePath)
+	data, err := os.ReadFile(fs.cfg.FileStoragePath)
 	if err != nil {
 		return nil, err
 	}
 
-	var loadedMetrics [][]models.Metrics
+	var loadedMetrics []models.Metrics
 	if err = json.Unmarshal(data, &loadedMetrics); err != nil {
 		return nil, err
 	}
 
-	return loadedMetrics[len(loadedMetrics)-1], nil
+	return loadedMetrics, nil
 }
