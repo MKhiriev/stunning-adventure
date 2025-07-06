@@ -31,15 +31,21 @@ func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 	if metricFromBody.MType == models.Gauge {
 		_, err := h.MemStorage.UpdateGauge(metricFromBody)
 		if err != nil {
-			http.Error(w, "error occured during gauge metric update", http.StatusInternalServerError)
+			http.Error(w, "error occurred during gauge metric update", http.StatusInternalServerError)
 			return
 		}
 	} else {
 		_, err := h.MemStorage.AddCounter(metricFromBody)
 		if err != nil {
-			http.Error(w, "error occured during gauge metric update", http.StatusInternalServerError)
+			http.Error(w, "error occurred during gauge metric update", http.StatusInternalServerError)
 			return
 		}
+	}
+
+	err := h.FileStorage.SaveMetricsToFile(h.MemStorage.GetAllMetrics())
+	if err != nil {
+		http.Error(w, "error occurred during metrics save", http.StatusInternalServerError)
+		return
 	}
 
 	// 4. Set Content type to `application/json`
@@ -47,7 +53,7 @@ func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 	// 5. marshal in JSON saved metric
 	savedMetricJSON, err := json.Marshal(metricFromBody)
 	if err != nil {
-		http.Error(w, "error occured during marshalling saved metric to JSON", http.StatusInternalServerError)
+		http.Error(w, "error occurred during marshalling saved metric to JSON", http.StatusInternalServerError)
 		return
 	}
 
@@ -92,7 +98,7 @@ func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	// 4. Marshal
 	foundMetricJSON, err := json.Marshal(metricFromBodyWithoutValue)
 	if err != nil {
-		http.Error(w, "error occured during marshalling saved metric to JSON", http.StatusInternalServerError)
+		http.Error(w, "error occurred during marshalling saved metric to JSON", http.StatusInternalServerError)
 		return
 	}
 
@@ -151,6 +157,12 @@ func (h *Handler) HandleGauge(w http.ResponseWriter, metricValue string, metricN
 		return
 	}
 
+	err = h.FileStorage.SaveMetricsToFile(h.MemStorage.GetAllMetrics())
+	if err != nil {
+		http.Error(w, "error occurred during metrics save", http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -172,6 +184,12 @@ func (h *Handler) HandleCounter(w http.ResponseWriter, metricValue string, metri
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
+		return
+	}
+
+	err = h.FileStorage.SaveMetricsToFile(h.MemStorage.GetAllMetrics())
+	if err != nil {
+		http.Error(w, "error occurred during metrics save", http.StatusInternalServerError)
 		return
 	}
 
