@@ -2,9 +2,9 @@ package store
 
 import (
 	"encoding/json"
-	"errors"
 	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/models"
+	"log"
 	"os"
 )
 
@@ -50,9 +50,28 @@ func (fs *FileStorage) LoadMetricsFromFile() ([]models.Metrics, error) {
 	fs.mu.RLock()
 	defer fs.mu.RUnlock()
 
+	file, err := os.OpenFile(fs.cfg.FileStoragePath, os.O_RDONLY|os.O_CREATE, 0644)
+	if err != nil {
+		log.Printf("LoadMetricsFromFile: error opening file: %v", err)
+		return nil, err
+	}
+	defer file.Close()
+
+	fileInfo, err := file.Stat()
+	if err != nil {
+		log.Printf("LoadMetricsFromFile: error stating file: %v", err)
+		return nil, err
+	}
+	if fileInfo.Size() == 0 {
+		log.Println("LoadMetricsFromFile: file is empty, returning empty slice")
+		return []models.Metrics{}, nil
+	}
+
 	data, err := os.ReadFile(fs.cfg.FileStoragePath)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		log.Printf("LoadMetricsFromFile: %v", err)
+		if os.IsNotExist(err) {
+			log.Printf("LoadMetricsFromFile: FILE NOT EXISTS ERROR %v", err)
 			return []models.Metrics{}, nil
 		}
 		return nil, err
@@ -60,6 +79,7 @@ func (fs *FileStorage) LoadMetricsFromFile() ([]models.Metrics, error) {
 
 	var loadedMetrics []models.Metrics
 	if err = json.Unmarshal(data, &loadedMetrics); err != nil {
+		log.Printf("LoadMetricsFromFile: error unmarshalling json: %v", err)
 		return nil, err
 	}
 
