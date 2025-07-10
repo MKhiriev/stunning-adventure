@@ -13,6 +13,7 @@ import (
 
 func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 	h.Logger.Info().Msg("h.UpdateMetricJSON() was called")
+	h.Logger.Info().Msgf("h.UpdateMetricJSON(): current metrics in mem: %v", h.MemStorage.GetAllMetrics())
 	allowedMetricTypes := []string{models.Gauge, models.Counter}
 	var metricFromBody models.Metrics
 
@@ -73,6 +74,7 @@ func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	h.Logger.Info().Msg("h.GetMetricJSON() was called")
+	h.Logger.Info().Msgf("h.GetMetricJSON(): current metrics in mem: %v", h.MemStorage.GetAllMetrics())
 	w.Header().Set("Content-Type", "application/json")
 	allowedMetricTypes := []string{models.Gauge, models.Counter}
 	var metricFromBodyWithoutValue models.Metrics
@@ -262,6 +264,8 @@ func (h *Handler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+
 	err = html.Execute(w, allHTMLMetrics)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

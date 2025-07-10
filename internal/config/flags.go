@@ -13,8 +13,8 @@ const (
 	defaultReportInterval  = int64(5)
 	defaultServerAddress   = "localhost:8080"
 	defaultStoreInterval   = int64(300)
-	defaultFileStoragePath = "internal/store/metrics.log"
-	defaultRestoreValue    = false
+	defaultFileStoragePath = "tmp"
+	defaultRestoreValue    = true
 )
 
 type NetAddress struct {

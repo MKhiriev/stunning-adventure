@@ -2,6 +2,7 @@ package agent
 
 import (
 	"github.com/MKhiriev/stunning-adventure/models"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"net/http"
@@ -139,7 +140,7 @@ func TestSendMetrics(t *testing.T) {
 }
 
 func initAgent() *MetricsAgent {
-	return NewMetricsAgent("0.0.0.0", "update", 2, 1)
+	return NewMetricsAgent("0.0.0.0", "update", 2, 1, &zerolog.Logger{})
 }
 
 func mDelta(v int) *int64 {

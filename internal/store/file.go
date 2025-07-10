@@ -6,6 +6,7 @@ import (
 	"github.com/MKhiriev/stunning-adventure/models"
 	"log"
 	"os"
+	"path"
 )
 
 type MetricsFileStorage interface {
@@ -16,12 +17,18 @@ type MetricsFileStorage interface {
 type FileStorage struct {
 	cfg *config.ServerConfig
 	*MemStorage
+	fullFileName string
 }
 
 func NewFileStorage(memStorage *MemStorage, cfg *config.ServerConfig) *FileStorage {
 	fs := &FileStorage{
-		MemStorage: memStorage,
-		cfg:        cfg,
+		MemStorage:   memStorage,
+		cfg:          cfg,
+		fullFileName: path.Join(cfg.FileStoragePath, "metrics.log"),
+	}
+
+	if err := os.MkdirAll(path.Dir(fs.fullFileName), 0755); err != nil {
+		log.Println("SaveMetricsToFile: cannot create directory:", err)
 	}
 
 	if cfg.RestoreMetricsFromFile {
@@ -43,14 +50,17 @@ func (fs *FileStorage) SaveMetricsToFile(allMetrics []models.Metrics) error {
 		return err
 	}
 
-	return os.WriteFile(fs.cfg.FileStoragePath, jsonData, 0644)
+	err = os.WriteFile(fs.fullFileName, jsonData, 0666)
+	log.Println("CREATED FILE err: ", err)
+	return err
+	//return os.WriteFile(fs.cfg.FileStoragePath+fs.fileName, jsonData, 0666)
 }
 
 func (fs *FileStorage) LoadMetricsFromFile() ([]models.Metrics, error) {
 	fs.mu.RLock()
 	defer fs.mu.RUnlock()
 
-	file, err := os.OpenFile(fs.cfg.FileStoragePath, os.O_RDONLY|os.O_CREATE, 0644)
+	file, err := os.OpenFile(fs.fullFileName, os.O_RDONLY|os.O_CREATE, 0644)
 	if err != nil {
 		log.Printf("LoadMetricsFromFile: error opening file: %v", err)
 		return nil, err
@@ -67,7 +77,7 @@ func (fs *FileStorage) LoadMetricsFromFile() ([]models.Metrics, error) {
 		return []models.Metrics{}, nil
 	}
 
-	data, err := os.ReadFile(fs.cfg.FileStoragePath)
+	data, err := os.ReadFile(fs.fullFileName)
 	if err != nil {
 		log.Printf("LoadMetricsFromFile: %v", err)
 		if os.IsNotExist(err) {

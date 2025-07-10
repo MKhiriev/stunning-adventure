@@ -1,11 +1,15 @@
 package agent
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/MKhiriev/stunning-adventure/internal/utils"
 	"github.com/MKhiriev/stunning-adventure/models"
 	"github.com/go-resty/resty/v2"
+	"github.com/rs/zerolog"
 	"math/rand/v2"
 	"net/http"
 	"runtime"
@@ -23,9 +27,10 @@ type MetricsAgent struct {
 	ReportInterval int64
 	PollInterval   int64
 	mu             sync.RWMutex
+	Logger         *zerolog.Logger
 }
 
-func NewMetricsAgent(serverAddress string, route string, reportInterval, pollInterval int64) *MetricsAgent {
+func NewMetricsAgent(serverAddress string, route string, reportInterval, pollInterval int64, logger *zerolog.Logger) *MetricsAgent {
 	return &MetricsAgent{
 		ServerAddress:  "http://" + serverAddress,
 		Route:          route,
@@ -34,6 +39,7 @@ func NewMetricsAgent(serverAddress string, route string, reportInterval, pollInt
 		PollCount:      0,
 		ReportInterval: reportInterval,
 		PollInterval:   pollInterval,
+		Logger:         logger,
 	}
 }
 
@@ -60,13 +66,19 @@ func (m *MetricsAgent) SendMetricsJSON() error {
 	route := fmt.Sprintf("%s/%s/", m.ServerAddress, m.Route)
 	// send every metric retrieved from memory
 	for _, metric := range allMetrics {
+		var response models.Metrics
+		compressedMetric, _ := gzipCompress(metric)
 		_, err := resty.New().R().
 			SetHeaders(map[string]string{
 				"Content-Type":     "application/json",
 				"Content-Encoding": "gzip",
 			}).
-			SetBody(metric).
+			SetDebug(true).
+			SetBody(compressedMetric).
+			SetResult(&response).
 			Post(route)
+
+		m.Logger.Info().Any("response", response).Msg("response from server")
 
 		if err != nil {
 			return err
@@ -199,4 +211,24 @@ func counterMetric(name string, value int64) models.Metrics {
 		MType: models.Counter,
 		Delta: &value,
 	}
+}
+
+func gzipCompress(metric models.Metrics) ([]byte, error) {
+	// сериализуем metric в JSON
+	jsonData, err := json.Marshal(metric)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal metric: %w", err)
+	}
+
+	// создаем gzip-сжатие
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	if _, err := gz.Write(jsonData); err != nil {
+		return nil, fmt.Errorf("failed to gzip compress: %w", err)
+	}
+	if err := gz.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close gzip writer: %w", err)
+	}
+
+	return buf.Bytes(), nil
 }
