@@ -9,7 +9,9 @@ import (
 
 func main() {
 	cfg, log := Init()
-	err := agent.NewMetricsAgent(cfg.ServerAddress, "update", cfg.ReportInterval, cfg.PollInterval, log).Run()
+	log.Info().Msg("Agent started")
+
+	err := agent.NewMetricsAgent("update", cfg, log).Run()
 	log.Err(err)
 }
 

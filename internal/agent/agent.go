@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/internal/utils"
 	"github.com/MKhiriev/stunning-adventure/models"
 	"github.com/go-resty/resty/v2"
@@ -30,15 +31,15 @@ type MetricsAgent struct {
 	Logger         *zerolog.Logger
 }
 
-func NewMetricsAgent(serverAddress string, route string, reportInterval, pollInterval int64, logger *zerolog.Logger) *MetricsAgent {
+func NewMetricsAgent(route string, cfg *config.AgentConfig, logger *zerolog.Logger) *MetricsAgent {
 	return &MetricsAgent{
-		ServerAddress:  "http://" + serverAddress,
+		ServerAddress:  "http://" + cfg.ServerAddress,
 		Route:          route,
 		Client:         resty.New(),
 		Memory:         NewStorage(),
 		PollCount:      0,
-		ReportInterval: reportInterval,
-		PollInterval:   pollInterval,
+		ReportInterval: cfg.ReportInterval,
+		PollInterval:   cfg.PollInterval,
 		Logger:         logger,
 	}
 }

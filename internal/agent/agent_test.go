@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/models"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -140,7 +141,12 @@ func TestSendMetrics(t *testing.T) {
 }
 
 func initAgent() *MetricsAgent {
-	return NewMetricsAgent("0.0.0.0", "update", 2, 1, &zerolog.Logger{})
+	cfg := &config.AgentConfig{
+		ServerAddress:  "0.0.0.0",
+		ReportInterval: 2,
+		PollInterval:   1,
+	}
+	return NewMetricsAgent("update", cfg, &zerolog.Logger{})
 }
 
 func mDelta(v int) *int64 {

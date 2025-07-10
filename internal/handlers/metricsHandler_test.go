@@ -134,7 +134,7 @@ func initHandler() *Handler {
 	cfg := &config.ServerConfig{
 		ServerAddress:          "localhost:8080",
 		StoreInterval:          300,
-		FileStoragePath:        "internal/store/metrics.log",
+		FileStoragePath:        "tmp",
 		RestoreMetricsFromFile: false,
 	}
 	memStorage := store.NewMemStorage()

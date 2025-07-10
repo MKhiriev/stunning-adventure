@@ -24,7 +24,7 @@ func NewHandler(memStorage *store.MemStorage, fileStorage *store.FileStorage, lo
 func (h *Handler) Init() *chi.Mux {
 	router := chi.NewRouter()
 
-	router.Use(middleware.Recoverer, h.WithLogging, GZipMiddleware /*WithGzipCompression*/)
+	router.Use(middleware.Recoverer, h.WithLogging, GZip)
 
 	router.Post("/update/", h.UpdateMetricJSON)
 	router.Post("/value/", h.GetMetricJSON)

@@ -17,7 +17,7 @@ func main() {
 	fileStorage := store.NewFileStorage(memStorage, cfg)
 	handler := handlers.NewHandler(memStorage, fileStorage, log)
 	myServer := new(server.Server)
-	myServer.ServerRun(handler.Init(), cfg.ServerAddress)
+	myServer.ServerRun(handler.Init(), cfg)
 }
 
 func Init() (*config.ServerConfig, *zerolog.Logger) {
