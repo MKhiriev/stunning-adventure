@@ -70,7 +70,7 @@ func GetServerConfigs() *ServerConfig {
 	if cfg.FileStoragePath == "" {
 		cfg.FileStoragePath = commandLineFileStoragePath
 	}
-	if cfg.RestoreMetricsFromFile == false && commandLineRestore != false {
+	if !cfg.RestoreMetricsFromFile && !commandLineRestore {
 		cfg.RestoreMetricsFromFile = commandLineRestore
 	}
 

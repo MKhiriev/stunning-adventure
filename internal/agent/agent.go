@@ -74,12 +74,11 @@ func (m *MetricsAgent) SendMetricsJSON() error {
 				"Content-Type":     "application/json",
 				"Content-Encoding": "gzip",
 			}).
-			SetDebug(true).
 			SetBody(compressedMetric).
 			SetResult(&response).
 			Post(route)
 
-		m.Logger.Info().Any("response", response).Msg("response from server")
+		m.Logger.Info().Any("request", compressedMetric).Any("response", response).Msg("request & response from server")
 
 		if err != nil {
 			return err
