@@ -42,8 +42,8 @@ func (m *MemStorage) AddCounter(metrics models.Metrics) (models.Metrics, error) 
 		newDelta := *val.Delta + *metrics.Delta
 		val.Delta = &newDelta
 
-		m.Memory[metrics.ID] = metrics
-		result = metrics
+		m.Memory[metrics.ID] = val
+		result = val
 	} else {
 		// if metric name doesn't exist - add it
 		m.Memory[metrics.ID] = metrics
