@@ -41,7 +41,8 @@ func (m *MemStorage) AddCounter(metrics models.Metrics) (models.Metrics, error) 
 		//		если какое-то значение уже было известно серверу.`
 		//newDelta := *val.Delta + *metrics.Delta
 		//val.Delta = &newDelta
-		val.Delta = metrics.Delta
+		newDelta := *val.Delta + *metrics.Delta
+		val.Delta = &newDelta
 
 		m.Memory[metrics.ID] = val
 		result = val
