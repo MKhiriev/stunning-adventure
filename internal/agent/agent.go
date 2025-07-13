@@ -158,6 +158,7 @@ func (m *MetricsAgent) Run() error {
 }
 
 func (m *MetricsAgent) getSliceOfMetrics(memStats runtime.MemStats) []models.Metrics {
+	m.pollCount++
 	return []models.Metrics{
 		gaugeMetric("Alloc", float64(memStats.Alloc)),
 		gaugeMetric("BuckHashSys", float64(memStats.BuckHashSys)),
@@ -186,7 +187,7 @@ func (m *MetricsAgent) getSliceOfMetrics(memStats runtime.MemStats) []models.Met
 		gaugeMetric("StackSys", float64(memStats.StackSys)),
 		gaugeMetric("Sys", float64(memStats.Sys)),
 		gaugeMetric("TotalAlloc", float64(memStats.TotalAlloc)),
-		counterMetric("pollCount", m.pollCount),
+		counterMetric("PollCount", m.pollCount),
 		gaugeMetric("RandomValue", rand.Float64()),
 	}
 }
