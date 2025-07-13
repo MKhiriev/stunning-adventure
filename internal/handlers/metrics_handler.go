@@ -245,9 +245,10 @@ func (h *Handler) GetMetricValue(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 	html, err := template.ParseFiles("web/template/all-metrics.html", "web/template/metrics-list.html")
-	if err != nil || html != nil {
+	if err != nil || html == nil {
 		h.logger.Err(err).Caller().Str("func", "*Handler.GetAllMetrics").Msg("error during parsing html templates")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
 
 	allMetrics := h.memStorage.GetAllMetrics()
@@ -269,6 +270,7 @@ func (h *Handler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.logger.Err(err).Caller().Str("func", "*Handler.GetAllMetrics").Msg("error during executing html templates")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
 }
 
