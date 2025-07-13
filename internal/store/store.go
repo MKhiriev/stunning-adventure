@@ -39,8 +39,9 @@ func (m *MemStorage) AddCounter(metrics models.Metrics) (models.Metrics, error) 
 		// commented code was added because of increment's 1 rule:
 		// 		`- Тип `counter`, `int64` — новое значение должно добавляться к предыдущему,
 		//		если какое-то значение уже было известно серверу.`
-		newDelta := *val.Delta + *metrics.Delta
-		val.Delta = &newDelta
+		//newDelta := *val.Delta + *metrics.Delta
+		//val.Delta = &newDelta
+		val.Delta = metrics.Delta
 
 		m.Memory[metrics.ID] = val
 		result = val
