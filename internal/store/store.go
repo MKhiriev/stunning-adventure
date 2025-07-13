@@ -16,16 +16,16 @@ type MetricsStorage interface {
 }
 type MemStorage struct {
 	Memory map[string]models.Metrics `json:"metrics"`
-	mu     sync.RWMutex
+	mu     *sync.Mutex
 }
 
 func NewMemStorage() *MemStorage {
-	return &MemStorage{Memory: make(map[string]models.Metrics)}
+	return &MemStorage{Memory: make(map[string]models.Metrics), mu: &sync.Mutex{}}
 }
 
 func (m *MemStorage) AddCounter(metrics models.Metrics) (models.Metrics, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	var result models.Metrics
 
@@ -51,8 +51,8 @@ func (m *MemStorage) AddCounter(metrics models.Metrics) (models.Metrics, error) 
 }
 
 func (m *MemStorage) UpdateGauge(metrics models.Metrics) (models.Metrics, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	var result models.Metrics
 
@@ -76,8 +76,8 @@ func (m *MemStorage) UpdateGauge(metrics models.Metrics) (models.Metrics, error)
 }
 
 func (m *MemStorage) GetMetricByNameAndType(metricName string, metricType string) (models.Metrics, bool) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	foundMetric, ok := m.Memory[metricName]
 	if ok {
@@ -91,8 +91,8 @@ func (m *MemStorage) GetMetricByNameAndType(metricName string, metricType string
 }
 
 func (m *MemStorage) GetAllMetrics() []models.Metrics {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	return slices.Collect(maps.Values(m.Memory))
 }

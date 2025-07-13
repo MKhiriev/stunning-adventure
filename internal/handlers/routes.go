@@ -8,16 +8,16 @@ import (
 )
 
 type Handler struct {
-	MemStorage  *store.MemStorage
-	FileStorage *store.FileStorage
-	Logger      *zerolog.Logger
+	memStorage  *store.MemStorage
+	fileStorage *store.FileStorage
+	logger      *zerolog.Logger
 }
 
 func NewHandler(memStorage *store.MemStorage, fileStorage *store.FileStorage, logger *zerolog.Logger) *Handler {
 	return &Handler{
-		MemStorage:  memStorage,
-		FileStorage: fileStorage,
-		Logger:      logger,
+		memStorage:  memStorage,
+		fileStorage: fileStorage,
+		logger:      logger,
 	}
 }
 

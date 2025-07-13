@@ -41,8 +41,8 @@ func NewFileStorage(memStorage *MemStorage, cfg *config.ServerConfig) *FileStora
 }
 
 func (fs *FileStorage) SaveMetricsToFile(allMetrics []models.Metrics) error {
-	fs.mu.RLock()
-	defer fs.mu.RUnlock()
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
 
 	jsonData, err := json.Marshal(allMetrics)
 	if err != nil {
@@ -53,8 +53,8 @@ func (fs *FileStorage) SaveMetricsToFile(allMetrics []models.Metrics) error {
 }
 
 func (fs *FileStorage) LoadMetricsFromFile() ([]models.Metrics, error) {
-	fs.mu.RLock()
-	defer fs.mu.RUnlock()
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
 
 	// open existing file or create new
 	file, err := os.OpenFile(fs.fullFileName, os.O_RDONLY|os.O_CREATE, 0644)

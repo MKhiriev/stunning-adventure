@@ -40,7 +40,7 @@ func (h *Handler) WithLogging(handler http.Handler) http.Handler {
 
 		duration := time.Since(start)
 
-		h.Logger.Info().
+		h.logger.Info().
 			Str("uri", uri).
 			Str("method", method).
 			Int("status", responseData.status).
@@ -52,6 +52,7 @@ func (h *Handler) WithLogging(handler http.Handler) http.Handler {
 	return http.HandlerFunc(logFn)
 }
 
+// CheckHTTPMethod метод для возвращения статус кода 404 в случае обращения к зарегистрированному роуту с неправильным методом
 func CheckHTTPMethod(router *chi.Mux) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		requestedURL := r.URL.Path

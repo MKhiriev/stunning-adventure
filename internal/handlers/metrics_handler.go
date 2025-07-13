@@ -16,14 +16,14 @@ func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 
 	// 1. Get JSON from the body
 	if err := json.NewDecoder(r.Body).Decode(&metricFromBody); err != nil {
-		h.Logger.Err(err).Msg("Invalid JSON was passed")
+		h.logger.Err(err).Caller().Str("func", "*Handler.UpdateMetricJSON").Msg("Invalid JSON was passed")
 		http.Error(w, "Invalid JSON was passed", http.StatusBadRequest)
 		return
 	}
 
 	// 2. Check if metric from JSON is valid => if not - StatusBadRequest
 	if metricFromBody.ID == "" || metricFromBody.MType == "" || !slices.Contains(allowedMetricTypes, metricFromBody.MType) {
-		h.Logger.Error().Any("metric", metricFromBody).Msg("passed metric is not valid")
+		h.logger.Error().Caller().Str("func", "*Handler.UpdateMetricJSON").Any("metric", metricFromBody).Msg("passed metric is not valid")
 		http.Error(w, "Passed metric is not valid", http.StatusBadRequest)
 		return
 	}
@@ -31,24 +31,24 @@ func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 	var err error
 	// 3. Update metric's value based on it's type - first you need to do it ugly
 	if metricFromBody.MType == models.Gauge {
-		metricFromBody, err = h.MemStorage.UpdateGauge(metricFromBody)
+		metricFromBody, err = h.memStorage.UpdateGauge(metricFromBody)
 		if err != nil {
-			h.Logger.Err(err).Msg("error occurred during gauge metric update")
-			http.Error(w, "error occurred during gauge metric update", http.StatusInternalServerError)
+			h.logger.Err(err).Caller().Str("func", "*Handler.UpdateMetricJSON").Msg("error occurred during gauge metric update")
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
 	} else {
-		metricFromBody, err = h.MemStorage.AddCounter(metricFromBody)
+		metricFromBody, err = h.memStorage.AddCounter(metricFromBody)
 		if err != nil {
-			h.Logger.Err(err).Msg("error occurred during gauge metric update")
-			http.Error(w, "error occurred during gauge metric update", http.StatusInternalServerError)
+			h.logger.Err(err).Caller().Str("func", "*Handler.UpdateMetricJSON").Msg("error occurred during gauge metric update")
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
 	}
 
-	if err := h.FileStorage.SaveMetricsToFile(h.MemStorage.GetAllMetrics()); err != nil {
-		h.Logger.Err(err).Msg("error occurred during metrics save to file")
-		http.Error(w, "error occurred during metrics save", http.StatusInternalServerError)
+	if err := h.fileStorage.SaveMetricsToFile(h.memStorage.GetAllMetrics()); err != nil {
+		h.logger.Err(err).Caller().Str("func", "*Handler.UpdateMetricJSON").Msg("error occurred during metrics save to file")
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -57,8 +57,8 @@ func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 	// 5. marshal in JSON saved metric
 	savedMetricJSON, err := json.Marshal(metricFromBody)
 	if err != nil {
-		h.Logger.Err(err).Msg("error occurred during marshalling saved metric to JSON")
-		http.Error(w, "error occurred during marshalling saved metric to JSON", http.StatusInternalServerError)
+		h.logger.Err(err).Caller().Str("func", "*Handler.UpdateMetricJSON").Msg("error occurred during marshalling saved metric to JSON")
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -74,23 +74,23 @@ func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 
 	// 1. Get JSON from the body
 	if err := json.NewDecoder(r.Body).Decode(&metricFromBodyWithoutValue); err != nil {
-		h.Logger.Err(err).Msg("Invalid JSON was passed")
+		h.logger.Err(err).Caller().Str("func", "*Handler.GetMetricJSON").Msg("Invalid JSON was passed")
 		http.Error(w, "Invalid JSON was passed", http.StatusBadRequest)
 		return
 	}
 
 	// 2. Check if metric from JSON is valid => if not - StatusBadRequest
 	if metricFromBodyWithoutValue.ID == "" || metricFromBodyWithoutValue.MType == "" || !slices.Contains(allowedMetricTypes, metricFromBodyWithoutValue.MType) {
-		h.Logger.Error().Any("metric", metricFromBodyWithoutValue).Msg("passed metric is not valid")
+		h.logger.Error().Caller().Str("func", "*Handler.GetMetricJSON").Any("metric", metricFromBodyWithoutValue).Msg("passed metric is not valid")
 		http.Error(w, "passed metric is not valid", http.StatusBadRequest)
 		return
 	}
 
 	// 3. Find metric in memory
-	foundMetric, ok := h.MemStorage.GetMetricByNameAndType(metricFromBodyWithoutValue.ID, metricFromBodyWithoutValue.MType)
+	foundMetric, ok := h.memStorage.GetMetricByNameAndType(metricFromBodyWithoutValue.ID, metricFromBodyWithoutValue.MType)
 
 	if !ok {
-		h.Logger.Info().Msg("metric not found")
+		h.logger.Info().Caller().Str("func", "*Handler.GetMetricJSON").Any("metric to find", metricFromBodyWithoutValue).Msg("metric not found")
 		w.WriteHeader(http.StatusNotFound)
 	}
 	if metricFromBodyWithoutValue.MType == models.Gauge && foundMetric.Value != nil {
@@ -105,8 +105,8 @@ func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	// 4. Marshal
 	foundMetricJSON, err := json.Marshal(metricFromBodyWithoutValue)
 	if err != nil {
-		h.Logger.Err(err).Msg("error occurred during marshalling metric from memory to JSON")
-		http.Error(w, "error occurred during marshalling metric from memory to JSON", http.StatusInternalServerError)
+		h.logger.Err(err).Caller().Str("func", "*Handler.GetMetricJSON").Msg("error occurred during marshalling metric from memory to JSON")
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -124,12 +124,14 @@ func (h *Handler) MetricHandler(w http.ResponseWriter, r *http.Request) {
 
 	// if metric name is not specified
 	if metricName == "" {
+		h.logger.Error().Caller().Str("func", "*Handler.MetricHandler").Msg("metric name is not specified")
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	// if metric type is not valued => http.StatusBadRequest
+	// if metric type is not valid => http.StatusBadRequest
 	if !slices.Contains(metrics, metricType) {
+		h.logger.Error().Caller().Str("func", "*Handler.MetricHandler").Msg("metric type is not valid")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -148,6 +150,7 @@ func (h *Handler) HandleGauge(w http.ResponseWriter, metricValue string, metricN
 	gaugeValue, conversionError := strconv.ParseFloat(metricValue, 64)
 	// if metric value type is wrong => http.StatusBadRequest
 	if conversionError != nil {
+		h.logger.Error().Caller().Str("func", "*Handler.HandleGauge").Msg("metric value type is wrong")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -158,16 +161,17 @@ func (h *Handler) HandleGauge(w http.ResponseWriter, metricValue string, metricN
 		Value: &gaugeValue,
 	}
 
-	_, err := h.MemStorage.UpdateGauge(gaugeMetricToSave)
+	_, err := h.memStorage.UpdateGauge(gaugeMetricToSave)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
+		h.logger.Err(err).Caller().Str("func", "*Handler.HandleGauge").Msg("error during updating gauge metric")
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
-	err = h.FileStorage.SaveMetricsToFile(h.MemStorage.GetAllMetrics())
+	err = h.fileStorage.SaveMetricsToFile(h.memStorage.GetAllMetrics())
 	if err != nil {
-		http.Error(w, "error occurred during metrics save", http.StatusInternalServerError)
+		h.logger.Err(err).Caller().Str("func", "*Handler.HandleGauge").Msg("error during saving all metrics to file")
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -188,16 +192,17 @@ func (h *Handler) HandleCounter(w http.ResponseWriter, metricValue string, metri
 		Delta: &counterValue,
 	}
 
-	_, err := h.MemStorage.AddCounter(counterMetricToSave)
+	_, err := h.memStorage.AddCounter(counterMetricToSave)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
+		h.logger.Err(err).Caller().Str("func", "*Handler.HandleCounter").Msg("error during updating counter metric")
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
-	err = h.FileStorage.SaveMetricsToFile(h.MemStorage.GetAllMetrics())
+	err = h.fileStorage.SaveMetricsToFile(h.memStorage.GetAllMetrics())
 	if err != nil {
-		http.Error(w, "error occurred during metrics save", http.StatusInternalServerError)
+		h.logger.Err(err).Caller().Str("func", "*Handler.HandleCounter").Msg("error during saving all metrics to file")
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -210,36 +215,42 @@ func (h *Handler) GetMetricValue(w http.ResponseWriter, r *http.Request) {
 	metricName := chi.URLParam(r, "metricName")
 
 	if metricName == "" {
+		h.logger.Error().Caller().Str("func", "*Handler.GetMetricValue").Msg("metric name is not specified")
 		w.WriteHeader(http.StatusNotFound)
+		return
 	}
 
 	metrics := []string{models.Gauge, models.Counter}
 	if !slices.Contains(metrics, metricType) {
+		h.logger.Error().Caller().Str("func", "*Handler.GetMetricValue").Msg("metric type is not valid")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	metric, isMetricFound := h.MemStorage.GetMetricByNameAndType(metricName, metricType)
+	metric, isMetricFound := h.memStorage.GetMetricByNameAndType(metricName, metricType)
 
 	// if metric is present
 	if isMetricFound {
+		h.logger.Info().Caller().Str("func", "*Handler.GetMetricValue").Any("metric", metric).Msg("found metric")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(
 			h.getValueFromMetric(metric),
 		))
 	} else {
 		// if not present - return not found
+		h.logger.Error().Caller().Str("func", "*Handler.GetMetricValue").Msg("metric not found")
 		w.WriteHeader(http.StatusNotFound)
 	}
 }
 
 func (h *Handler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 	html, err := template.ParseFiles("web/template/all-metrics.html", "web/template/metrics-list.html")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if err != nil || html != nil {
+		h.logger.Err(err).Caller().Str("func", "*Handler.GetAllMetrics").Msg("error during parsing html templates")
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
 
-	allMetrics := h.MemStorage.GetAllMetrics()
+	allMetrics := h.memStorage.GetAllMetrics()
 	type HTMLMetric struct {
 		ID    string
 		MType string
@@ -256,7 +267,8 @@ func (h *Handler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 
 	err = html.Execute(w, allHTMLMetrics)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.logger.Err(err).Caller().Str("func", "*Handler.GetAllMetrics").Msg("error during executing html templates")
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
 }
 

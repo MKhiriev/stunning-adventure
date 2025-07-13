@@ -33,10 +33,10 @@ func TestReadMetrics(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			err := agent.ReadMetrics()
 			require.NoError(t, err)
-			assert.NotEmpty(t, agent.Memory.Metrics)
-			assert.Equal(t, test.want.length, len(agent.Memory.Metrics))
+			assert.NotEmpty(t, agent.memory.metrics)
+			assert.Equal(t, test.want.length, len(agent.memory.metrics))
 			// check for non nil values
-			for _, metric := range agent.Memory.Metrics {
+			for _, metric := range agent.memory.metrics {
 				if metric.MType == models.Gauge {
 					assert.NotNil(t, metric.Value)
 				}
@@ -112,7 +112,7 @@ func TestSendMetrics(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			agent.Memory.Metrics = map[string]models.Metrics{
+			agent.memory.metrics = map[string]models.Metrics{
 				test.metric.ID: test.metric,
 			}
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -132,7 +132,7 @@ func TestSendMetrics(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 			}))
 			defer server.Close()
-			agent.ServerAddress = server.URL
+			agent.serverAddress = server.URL
 
 			sendMetricsError := agent.SendMetrics()
 			require.NoError(t, sendMetricsError)

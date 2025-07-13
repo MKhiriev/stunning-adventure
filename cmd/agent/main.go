@@ -3,24 +3,14 @@ package main
 import (
 	"github.com/MKhiriev/stunning-adventure/internal/agent"
 	"github.com/MKhiriev/stunning-adventure/internal/config"
-	"github.com/rs/zerolog"
-	"os"
+	"github.com/MKhiriev/stunning-adventure/internal/utils"
 )
 
 func main() {
-	cfg, log := Init()
+	cfg := config.GetAgentConfigs()
+	log := utils.NewLogger("metrics-agent")
 	log.Info().Msg("Agent started")
 
 	err := agent.NewMetricsAgent("update", cfg, log).Run()
-	log.Err(err)
-}
-
-func Init() (*config.AgentConfig, *zerolog.Logger) {
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	logger := zerolog.New(os.Stdout).With().
-		Timestamp().
-		Str("role", "metrics-agent").
-		Logger()
-
-	return config.GetAgentConfigs(), &logger
+	log.Err(err).Caller().Str("func", "main").Msg("error occurred in agent during running")
 }
