@@ -33,14 +33,15 @@ func (m *MemStorage) AddCounter(metrics models.Metrics) (models.Metrics, error) 
 		return models.Metrics{}, errors.New("metric type is not `counter`")
 	}
 
-	_, ok := m.Memory[metrics.ID]
+	val, ok := m.Memory[metrics.ID]
 	// if metric name exists in storage - apply Counter logic
 	if ok {
 		// commented code was added because of increment's 1 rule:
 		// 		`- Тип `counter`, `int64` — новое значение должно добавляться к предыдущему,
 		//		если какое-то значение уже было известно серверу.`
-		//newDelta := *val.Delta + *metrics.Delta
-		//val.Delta = &newDelta
+		newDelta := *val.Delta + *metrics.Delta
+		val.Delta = &newDelta
+
 		m.Memory[metrics.ID] = metrics
 		result = metrics
 	} else {
