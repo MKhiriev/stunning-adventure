@@ -98,6 +98,8 @@ func (m *MetricsAgent) SendMetricsJSON() error {
 
 		m.logger.Info().Caller().Str("func", "*MetricsAgent.SendMetricsJSON").Any("request", compressedMetric).Any("response", response).Msg("request & response from server")
 	}
+	// after sending metrics set poll count to 0
+	m.pollCount = 0
 
 	return nil
 }

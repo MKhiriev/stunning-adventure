@@ -41,6 +41,8 @@ func (m *MemStorage) AddCounter(metrics models.Metrics) (models.Metrics, error) 
 		//		если какое-то значение уже было известно серверу.`
 		//newDelta := *val.Delta + *metrics.Delta
 		//val.Delta = &newDelta
+
+		// add previous counter value with new value from agent
 		newDelta := *val.Delta + *metrics.Delta
 		val.Delta = &newDelta
 
