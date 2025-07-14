@@ -134,6 +134,8 @@ func (m *MetricsAgent) SendMetrics() error {
 			return fmt.Errorf("error during metrics sending: %s", response.Status())
 		}
 	}
+	// after sending metrics set poll count to 0
+	m.pollCount = 0
 	return nil
 }
 
