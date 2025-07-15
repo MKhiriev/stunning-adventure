@@ -1,36 +1,48 @@
 package agent
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/MKhiriev/stunning-adventure/internal/config"
+	"github.com/MKhiriev/stunning-adventure/internal/utils"
 	"github.com/MKhiriev/stunning-adventure/models"
 	"github.com/go-resty/resty/v2"
+	"github.com/rs/zerolog"
 	"math/rand/v2"
 	"net/http"
+	"net/url"
 	"runtime"
 	"strconv"
+	"sync"
 	"time"
 )
 
 type MetricsAgent struct {
-	ServerAddress  string
-	Route          string
-	Client         *resty.Client
-	Memory         *AgentStorage
-	PollCount      int64
-	ReportInterval int64
-	PollInterval   int64
+	serverAddress  string
+	route          string
+	client         *resty.Client
+	memory         *AgentStorage
+	pollCount      int64
+	reportInterval int64
+	pollInterval   int64
+	mu             *sync.Mutex
+	logger         *zerolog.Logger
 }
 
-func NewMetricsAgent(serverAddress string, route string, reportInterval, pollInterval int64) *MetricsAgent {
+func NewMetricsAgent(route string, cfg *config.AgentConfig, logger *zerolog.Logger) *MetricsAgent {
 	return &MetricsAgent{
-		ServerAddress:  "http://" + serverAddress,
-		Route:          route,
-		Client:         resty.New(),
-		Memory:         NewStorage(),
-		PollCount:      0,
-		ReportInterval: reportInterval,
-		PollInterval:   pollInterval,
+		serverAddress:  "http://" + cfg.ServerAddress,
+		route:          route,
+		client:         resty.New(),
+		memory:         NewStorage(),
+		pollCount:      0,
+		reportInterval: cfg.ReportInterval,
+		pollInterval:   cfg.PollInterval,
+		logger:         logger,
+		mu:             &sync.Mutex{},
 	}
 }
 
@@ -40,18 +52,64 @@ func (m *MetricsAgent) ReadMetrics() error {
 
 	allMetrics := m.getSliceOfMetrics(memStats)
 	if len(allMetrics) == 0 {
+		m.logger.Error().Caller().Str("func", "*MetricsAgent.ReadMetrics").Msg("error occurred during getting MemStats metrics: no metrics in MemStats")
 		return errors.New("error occurred during getting MemStats metrics: no metrics in MemStats")
 	}
 
-	m.Memory.RefreshAllMetrics(allMetrics...)
+	m.memory.RefreshAllMetrics(allMetrics...)
+	return nil
+}
+
+func (m *MetricsAgent) SendMetricsJSON() error {
+	// get all metrics from memory
+	allMetrics := m.memory.GetAllMetrics()
+	if len(allMetrics) == 0 {
+		return errors.New("no metrics passed")
+	}
+
+	route, pathJoinError := url.JoinPath(m.serverAddress, m.route, "/")
+	if pathJoinError != nil {
+		m.logger.Err(pathJoinError).Caller().Str("func", "*MetricsAgent.SendMetricsJSON").Msg("url join error")
+		return fmt.Errorf("url join error: %w", pathJoinError)
+	}
+	// send every metric retrieved from memory
+	for _, metric := range allMetrics {
+		var response models.Metrics
+
+		// gzip encode metric
+		compressedMetric, compressionError := gzipCompress(metric)
+		if compressionError != nil {
+			m.logger.Err(compressionError).Caller().Str("func", "*MetricsAgent.SendMetricsJSON").Msg("error occurred during gzip compression")
+			return compressionError
+		}
+
+		_, sendMetricError := resty.New().R().
+			SetHeaders(map[string]string{
+				"Content-Type":     "application/json",
+				"Content-Encoding": "gzip",
+			}).
+			SetBody(compressedMetric).
+			SetResult(&response).
+			Post(route)
+		if sendMetricError != nil {
+			m.logger.Err(sendMetricError).Caller().Str("func", "*MetricsAgent.SendMetricsJSON").Msg("error occurred during sending metric")
+			return fmt.Errorf("error occurred during sending metric: %w", sendMetricError)
+		}
+
+		m.logger.Info().Caller().Str("func", "*MetricsAgent.SendMetricsJSON").Any("request", compressedMetric).Any("response", response).Msg("request & response from server")
+	}
+	// after sending metrics set poll count to 0
+	m.pollCount = 0
+
 	return nil
 }
 
 func (m *MetricsAgent) SendMetrics() error {
 	// get all metrics from memory
-	allMetrics := m.Memory.GetAllMetrics()
+	allMetrics := m.memory.GetAllMetrics()
 	if len(allMetrics) == 0 {
-		return errors.New("no metrics are passed")
+		m.logger.Error().Caller().Str("func", "*MetricsAgent.SendMetrics").Msg("no metrics passed")
+		return errors.New("no metrics passed")
 	}
 
 	// send every metric retrieved from memory
@@ -59,47 +117,52 @@ func (m *MetricsAgent) SendMetrics() error {
 		// construct route based on metric's type
 		route, err := m.getRoute(metric)
 		if err != nil {
+			m.logger.Err(err).Caller().Str("func", "*MetricsAgent.SendMetrics")
 			return err
 		}
 
-		response, err := m.Client.R().
+		response, sendMetricError := m.client.R().
 			SetHeader("Content-Type", "text/plain").
 			Post(route)
-		if err != nil {
-			return err
+		if sendMetricError != nil {
+			m.logger.Err(sendMetricError).Caller().Str("func", "*MetricsAgent.SendMetrics").Msg("error occurred during sending metric")
+			return fmt.Errorf("error occurred during sending metric: %w", sendMetricError)
 		}
 
 		if response.StatusCode() != http.StatusOK {
+			m.logger.Error().Caller().Str("func", "*MetricsAgent.SendMetrics").Bool("response.StatusCode == 200", false).Str("response.Status", response.Status()).Msg("error occurred during sending metric")
 			return fmt.Errorf("error during metrics sending: %s", response.Status())
 		}
 	}
+	// after sending metrics set poll count to 0
+	m.pollCount = 0
 	return nil
 }
 
 func (m *MetricsAgent) Run() error {
-	timeToSendMetrics := time.Now().Add(time.Duration(m.ReportInterval) * time.Second)
-	for {
-		// Read Metrics
-		if err := m.ReadMetrics(); err != nil {
-			return err
-		}
-		// wait 2 seconds
-		time.Sleep(time.Duration(m.PollInterval) * time.Second)
+	var err error
 
-		thisMoment := time.Now()
-		// check if it's time to send metrics
-		if thisMoment.Equal(timeToSendMetrics) || thisMoment.After(timeToSendMetrics) {
-			// Send Metrics
-			if err := m.SendMetrics(); err != nil {
-				return err
-			}
-			// set time to send metrics to the server
-			timeToSendMetrics = time.Now().Add(time.Duration(m.ReportInterval) * time.Second)
-		}
+	utils.RunWithTicker(func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		err = m.ReadMetrics()
+	}, time.Duration(m.pollInterval)*time.Second)
+
+	utils.RunWithTicker(func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		err = m.SendMetricsJSON()
+	}, time.Duration(m.reportInterval)*time.Second)
+	if err != nil {
+		m.logger.Err(err).Caller().Str("func", "*MetricsAgent.Run").Msg("error occurred during running metrics-agent")
+		return err
 	}
+
+	select {} // block main routine forever
 }
 
 func (m *MetricsAgent) getSliceOfMetrics(memStats runtime.MemStats) []models.Metrics {
+	m.pollCount++
 	return []models.Metrics{
 		gaugeMetric("Alloc", float64(memStats.Alloc)),
 		gaugeMetric("BuckHashSys", float64(memStats.BuckHashSys)),
@@ -128,7 +191,7 @@ func (m *MetricsAgent) getSliceOfMetrics(memStats runtime.MemStats) []models.Met
 		gaugeMetric("StackSys", float64(memStats.StackSys)),
 		gaugeMetric("Sys", float64(memStats.Sys)),
 		gaugeMetric("TotalAlloc", float64(memStats.TotalAlloc)),
-		counterMetric("PollCount", m.PollCount+1),
+		counterMetric("PollCount", m.pollCount),
 		gaugeMetric("RandomValue", rand.Float64()),
 	}
 }
@@ -137,20 +200,22 @@ func (m *MetricsAgent) getRoute(metric models.Metrics) (string, error) {
 	if metric.MType == models.Counter {
 		// check if Counter's Delta is not nil
 		if metric.Delta == nil {
+			m.logger.Error().Caller().Str("func", "*MetricsAgent.getRoute").Msg("no metric's data has been passed: field Delta is nil")
 			return "", errors.New("no metric's data has been passed: field Delta is nil")
 		}
 
-		return fmt.Sprintf("%s/%s/%s/%s/%d", m.ServerAddress, m.Route,
+		return fmt.Sprintf("%s/%s/%s/%s/%d", m.serverAddress, m.route,
 			metric.MType, metric.ID, *metric.Delta), nil
 	}
 
 	if metric.MType == models.Gauge {
 		// check if Gauge's Value is not nil
 		if metric.Value == nil {
+			m.logger.Error().Caller().Str("func", "*MetricsAgent.getRoute").Msg("no metric's data has been passed: field Value in nil")
 			return "", errors.New("no metric's data has been passed: field Value in nil")
 		}
 
-		return fmt.Sprintf("%s/%s/%s/%s/%s", m.ServerAddress, m.Route,
+		return fmt.Sprintf("%s/%s/%s/%s/%s", m.serverAddress, m.route,
 			metric.MType, metric.ID, strconv.FormatFloat(*metric.Value, 'f', -1, 64)), nil
 	}
 
@@ -171,4 +236,24 @@ func counterMetric(name string, value int64) models.Metrics {
 		MType: models.Counter,
 		Delta: &value,
 	}
+}
+
+func gzipCompress(metric models.Metrics) ([]byte, error) {
+	// сериализуем metric в JSON
+	jsonData, err := json.Marshal(metric)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal metric: %w", err)
+	}
+
+	// создаем gzip-сжатие
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	if _, err := gz.Write(jsonData); err != nil {
+		return nil, fmt.Errorf("failed to gzip compress: %w", err)
+	}
+	if err := gz.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close gzip writer: %w", err)
+	}
+
+	return buf.Bytes(), nil
 }

@@ -1,7 +1,9 @@
 package agent
 
 import (
+	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/models"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"net/http"
@@ -31,10 +33,10 @@ func TestReadMetrics(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			err := agent.ReadMetrics()
 			require.NoError(t, err)
-			assert.NotEmpty(t, agent.Memory.Metrics)
-			assert.Equal(t, test.want.length, len(agent.Memory.Metrics))
+			assert.NotEmpty(t, agent.memory.metrics)
+			assert.Equal(t, test.want.length, len(agent.memory.metrics))
 			// check for non nil values
-			for _, metric := range agent.Memory.Metrics {
+			for _, metric := range agent.memory.metrics {
 				if metric.MType == models.Gauge {
 					assert.NotNil(t, metric.Value)
 				}
@@ -110,7 +112,7 @@ func TestSendMetrics(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			agent.Memory.Metrics = map[string]models.Metrics{
+			agent.memory.metrics = map[string]models.Metrics{
 				test.metric.ID: test.metric,
 			}
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -130,7 +132,7 @@ func TestSendMetrics(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 			}))
 			defer server.Close()
-			agent.ServerAddress = server.URL
+			agent.serverAddress = server.URL
 
 			sendMetricsError := agent.SendMetrics()
 			require.NoError(t, sendMetricsError)
@@ -139,7 +141,12 @@ func TestSendMetrics(t *testing.T) {
 }
 
 func initAgent() *MetricsAgent {
-	return NewMetricsAgent("0.0.0.0", "update", 2, 1)
+	cfg := &config.AgentConfig{
+		ServerAddress:  "0.0.0.0",
+		ReportInterval: 2,
+		PollInterval:   1,
+	}
+	return NewMetricsAgent("update", cfg, &zerolog.Logger{})
 }
 
 func mDelta(v int) *int64 {

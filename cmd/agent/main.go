@@ -3,15 +3,14 @@ package main
 import (
 	"github.com/MKhiriev/stunning-adventure/internal/agent"
 	"github.com/MKhiriev/stunning-adventure/internal/config"
-	"log"
+	"github.com/MKhiriev/stunning-adventure/internal/utils"
 )
 
 func main() {
-	cfg := Init()
-	err := agent.NewMetricsAgent(cfg.ServerAddress, "update", cfg.ReportInterval, cfg.PollInterval).Run()
-	log.Fatal(err)
-}
+	cfg := config.GetAgentConfigs()
+	log := utils.NewLogger("metrics-agent")
+	log.Info().Msg("Agent started")
 
-func Init() *config.AgentConfig {
-	return config.GetAgentConfigs()
+	err := agent.NewMetricsAgent("update", cfg, log).Run()
+	log.Err(err).Caller().Str("func", "main").Msg("error occurred in agent during running")
 }

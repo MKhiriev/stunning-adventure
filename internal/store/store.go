@@ -5,6 +5,7 @@ import (
 	"github.com/MKhiriev/stunning-adventure/models"
 	"maps"
 	"slices"
+	"sync"
 )
 
 type MetricsStorage interface {
@@ -14,14 +15,20 @@ type MetricsStorage interface {
 	GetAllMetrics() []models.Metrics
 }
 type MemStorage struct {
-	Memory map[string]models.Metrics
+	Memory map[string]models.Metrics `json:"metrics"`
+	mu     *sync.Mutex
 }
 
 func NewMemStorage() *MemStorage {
-	return &MemStorage{Memory: make(map[string]models.Metrics)}
+	return &MemStorage{Memory: make(map[string]models.Metrics), mu: &sync.Mutex{}}
 }
 
 func (m *MemStorage) AddCounter(metrics models.Metrics) (models.Metrics, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var result models.Metrics
+
 	if metrics.MType != models.Counter {
 		return models.Metrics{}, errors.New("metric type is not `counter`")
 	}
@@ -29,19 +36,33 @@ func (m *MemStorage) AddCounter(metrics models.Metrics) (models.Metrics, error) 
 	val, ok := m.Memory[metrics.ID]
 	// if metric name exists in storage - apply Counter logic
 	if ok {
+		// commented code was added because of increment's 1 rule:
+		// 		`- Тип `counter`, `int64` — новое значение должно добавляться к предыдущему,
+		//		если какое-то значение уже было известно серверу.`
+		//newDelta := *val.Delta + *metrics.Delta
+		//val.Delta = &newDelta
+
+		// add previous counter value with new value from agent
 		newDelta := *val.Delta + *metrics.Delta
 		val.Delta = &newDelta
 
 		m.Memory[metrics.ID] = val
+		result = val
 	} else {
 		// if metric name doesn't exist - add it
 		m.Memory[metrics.ID] = metrics
+		result = metrics
 	}
 
-	return models.Metrics{}, nil
+	return result, nil
 }
 
 func (m *MemStorage) UpdateGauge(metrics models.Metrics) (models.Metrics, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var result models.Metrics
+
 	if metrics.MType != models.Gauge {
 		return models.Metrics{}, errors.New("metric type is not `gauge`")
 	}
@@ -51,15 +72,20 @@ func (m *MemStorage) UpdateGauge(metrics models.Metrics) (models.Metrics, error)
 	if ok {
 		val.Value = metrics.Value
 		m.Memory[metrics.ID] = val
+		result = val
 	} else {
 		// if metric name doesn't exist - add it
 		m.Memory[metrics.ID] = metrics
+		result = metrics
 	}
 
-	return models.Metrics{}, nil
+	return result, nil
 }
 
 func (m *MemStorage) GetMetricByNameAndType(metricName string, metricType string) (models.Metrics, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	foundMetric, ok := m.Memory[metricName]
 	if ok {
 		if foundMetric.MType == metricType {
@@ -72,5 +98,8 @@ func (m *MemStorage) GetMetricByNameAndType(metricName string, metricType string
 }
 
 func (m *MemStorage) GetAllMetrics() []models.Metrics {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	return slices.Collect(maps.Values(m.Memory))
 }

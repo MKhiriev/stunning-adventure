@@ -12,7 +12,10 @@ type AgentConfig struct {
 }
 
 type ServerConfig struct {
-	ServerAddress string `env:"ADDRESS"` // can define if anything was passed
+	ServerAddress          string `env:"ADDRESS"`
+	StoreInterval          int64  `env:"STORE_INTERVAL"`
+	FileStoragePath        string `env:"FILE_STORAGE_PATH"`
+	RestoreMetricsFromFile bool   `env:"RESTORE"`
 }
 
 func GetAgentConfigs() *AgentConfig {
@@ -50,14 +53,26 @@ func GetServerConfigs() *ServerConfig {
 		log.Fatal(err)
 	}
 
-	// if serverAddress is not nil return cfg
-	if cfg.ServerAddress != "" {
+	// if all values are not nil return cfg
+	if cfg.ServerAddress != "" && cfg.StoreInterval != 0 && cfg.FileStoragePath != "" {
 		return cfg
 	}
 
-	// else get command line args or default value
-	serverAddress := ParseServerFlags()
-	cfg.ServerAddress = serverAddress
+	// else get command line args or default values
+	commandLineServerAddress, commandLineStoreInterval, commandLineFileStoragePath, commandLineRestore := ParseServerFlags()
+
+	if cfg.ServerAddress == "" {
+		cfg.ServerAddress = commandLineServerAddress
+	}
+	if cfg.StoreInterval == 0 {
+		cfg.StoreInterval = commandLineStoreInterval
+	}
+	if cfg.FileStoragePath == "" {
+		cfg.FileStoragePath = commandLineFileStoragePath
+	}
+	if !cfg.RestoreMetricsFromFile && !commandLineRestore {
+		cfg.RestoreMetricsFromFile = commandLineRestore
+	}
 
 	return cfg
 }

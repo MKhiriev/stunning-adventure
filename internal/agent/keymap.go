@@ -7,17 +7,17 @@ import (
 )
 
 type AgentStorage struct {
-	Metrics map[string]models.Metrics
+	metrics map[string]models.Metrics
 }
 
 func NewStorage() *AgentStorage {
 	return &AgentStorage{
-		Metrics: make(map[string]models.Metrics),
+		metrics: make(map[string]models.Metrics),
 	}
 }
 
 func (c *AgentStorage) GetAllMetrics() []models.Metrics {
-	return slices.Collect(maps.Values(c.Metrics))
+	return slices.Collect(maps.Values(c.metrics))
 }
 
 func (c *AgentStorage) RefreshAllMetrics(metrics ...models.Metrics) {
@@ -31,11 +31,11 @@ func (c *AgentStorage) RefreshAllMetrics(metrics ...models.Metrics) {
 
 	// assign passed metrics to new map
 	for _, metric := range metrics {
-		c.Metrics[metric.ID] = metric
+		c.metrics[metric.ID] = metric
 	}
 }
 
 // Flush method is emptying the agent memory
 func (c *AgentStorage) Flush() {
-	c.Metrics = make(map[string]models.Metrics)
+	c.metrics = make(map[string]models.Metrics)
 }
