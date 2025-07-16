@@ -16,7 +16,6 @@ func main() {
 	conn, err := store.NewConnectPostgres(cfg, log)
 	if err != nil {
 		log.Err(err).Msg("connection to database failed")
-		return
 	}
 	memStorage := store.NewMemStorage()
 	fileStorage := store.NewFileStorage(memStorage, cfg)
