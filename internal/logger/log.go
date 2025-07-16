@@ -1,4 +1,4 @@
-package utils
+package logger
 
 import (
 	"github.com/rs/zerolog"
@@ -15,6 +15,7 @@ func NewLogger(role string) *zerolog.Logger {
 	logger := zerolog.New(os.Stdout).With().
 		Timestamp().
 		Str("role", role).
+		Caller().
 		Logger()
 
 	return &logger

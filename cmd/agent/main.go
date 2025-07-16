@@ -3,12 +3,12 @@ package main
 import (
 	"github.com/MKhiriev/stunning-adventure/internal/agent"
 	"github.com/MKhiriev/stunning-adventure/internal/config"
-	"github.com/MKhiriev/stunning-adventure/internal/utils"
+	"github.com/MKhiriev/stunning-adventure/internal/logger"
 )
 
 func main() {
 	cfg := config.GetAgentConfigs()
-	log := utils.NewLogger("metrics-agent")
+	log := logger.NewLogger("metrics-agent")
 	log.Info().Msg("Agent started")
 
 	err := agent.NewMetricsAgent("update", cfg, log).Run()

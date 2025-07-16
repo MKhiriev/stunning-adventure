@@ -11,13 +11,15 @@ type Handler struct {
 	memStorage  *store.MemStorage
 	fileStorage *store.FileStorage
 	logger      *zerolog.Logger
+	db          *store.DB
 }
 
-func NewHandler(memStorage *store.MemStorage, fileStorage *store.FileStorage, logger *zerolog.Logger) *Handler {
+func NewHandler(memStorage *store.MemStorage, fileStorage *store.FileStorage, db *store.DB, logger *zerolog.Logger) *Handler {
 	return &Handler{
 		memStorage:  memStorage,
 		fileStorage: fileStorage,
 		logger:      logger,
+		db:          db,
 	}
 }
 
@@ -31,6 +33,8 @@ func (h *Handler) Init() *chi.Mux {
 	router.Post("/update/{metricType}/{metricName}/{metricValue}", h.MetricHandler)
 	router.Get("/value/{metricType}/{metricName}", h.GetMetricValue)
 	router.Get("/", h.GetAllMetrics)
+
+	router.Get("/ping", h.Ping)
 
 	router.MethodNotAllowed(CheckHTTPMethod(router))
 

@@ -16,6 +16,7 @@ type ServerConfig struct {
 	StoreInterval          int64  `env:"STORE_INTERVAL"`
 	FileStoragePath        string `env:"FILE_STORAGE_PATH"`
 	RestoreMetricsFromFile bool   `env:"RESTORE"`
+	DatabaseDSN            string `env:"DATABASE_DSN"`
 }
 
 func GetAgentConfigs() *AgentConfig {
@@ -54,12 +55,12 @@ func GetServerConfigs() *ServerConfig {
 	}
 
 	// if all values are not nil return cfg
-	if cfg.ServerAddress != "" && cfg.StoreInterval != 0 && cfg.FileStoragePath != "" {
+	if cfg.ServerAddress != "" && cfg.StoreInterval != 0 && cfg.FileStoragePath != "" && cfg.DatabaseDSN != "" {
 		return cfg
 	}
 
 	// else get command line args or default values
-	commandLineServerAddress, commandLineStoreInterval, commandLineFileStoragePath, commandLineRestore := ParseServerFlags()
+	commandLineServerAddress, commandLineStoreInterval, commandLineFileStoragePath, commandLineRestore, databaseDSN := ParseServerFlags()
 
 	if cfg.ServerAddress == "" {
 		cfg.ServerAddress = commandLineServerAddress
@@ -70,8 +71,11 @@ func GetServerConfigs() *ServerConfig {
 	if cfg.FileStoragePath == "" {
 		cfg.FileStoragePath = commandLineFileStoragePath
 	}
-	if !cfg.RestoreMetricsFromFile && !commandLineRestore {
+	if !cfg.RestoreMetricsFromFile {
 		cfg.RestoreMetricsFromFile = commandLineRestore
+	}
+	if cfg.DatabaseDSN == "" {
+		cfg.DatabaseDSN = databaseDSN
 	}
 
 	return cfg

@@ -139,8 +139,9 @@ func initHandler() *Handler {
 	}
 	memStorage := store.NewMemStorage()
 	fileStorage := store.NewFileStorage(memStorage, cfg)
+	db := store.DB{}
 
-	return NewHandler(memStorage, fileStorage, &logger)
+	return NewHandler(memStorage, fileStorage, &db, &logger)
 }
 
 func mDelta(v int) *int64 {
