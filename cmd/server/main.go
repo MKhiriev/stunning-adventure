@@ -11,7 +11,7 @@ import (
 func main() {
 	cfg := config.GetServerConfigs()
 	log := logger.NewLogger("metrics-server")
-	log.Info().Msg("Server started")
+	log.Info().Any("cfg-srv", cfg).Msg("Server started")
 
 	conn, err := store.NewConnectPostgres(cfg, log)
 	if err != nil {
