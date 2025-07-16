@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"github.com/caarlos0/env/v11"
 	"log"
 )
@@ -47,7 +48,7 @@ func GetAgentConfigs() *AgentConfig {
 	return cfg
 }
 
-func GetServerConfigs() *ServerConfig {
+func GetServerConfigs() (*ServerConfig, error) {
 	cfg := &ServerConfig{}
 	err := env.Parse(cfg)
 	if err != nil {
@@ -56,7 +57,7 @@ func GetServerConfigs() *ServerConfig {
 
 	// if all values are not nil return cfg
 	if cfg.ServerAddress != "" && cfg.StoreInterval != 0 && cfg.FileStoragePath != "" && cfg.DatabaseDSN != "" {
-		return cfg
+		return cfg, cfg.Validate()
 	}
 
 	// else get command line args or default values
@@ -78,5 +79,20 @@ func GetServerConfigs() *ServerConfig {
 		cfg.DatabaseDSN = databaseDSN
 	}
 
-	return cfg
+	return cfg, cfg.Validate()
+}
+
+func (s *ServerConfig) Validate() error {
+	switch {
+	case s.ServerAddress == "":
+		return errors.New("invalid Server Address")
+	case s.StoreInterval == 0:
+		return errors.New("invalid Store Interval")
+	case s.FileStoragePath == "":
+		return errors.New("invalid File Storage Path")
+	case s.DatabaseDSN == "":
+		return errors.New("invalid Database Source Name")
+	}
+
+	return nil
 }

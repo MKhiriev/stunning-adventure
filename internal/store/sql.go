@@ -19,6 +19,7 @@ func NewConnectPostgres(cfg *config.ServerConfig, log *zerolog.Logger) (*DB, err
 		return nil, fmt.Errorf("error occured during database connection: %w", err)
 	}
 
+	log.Info().Msg("connected to database successfully")
 	return &DB{
 		Conn:   conn,
 		logger: log,

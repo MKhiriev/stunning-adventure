@@ -15,7 +15,7 @@ const (
 	defaultStoreInterval   = int64(300)
 	defaultFileStoragePath = "tmp"
 	defaultRestoreValue    = true
-	defaultDatabaseDSN     = "postgres://postgres:postgrespassword@localhost:5432/practikum"
+	defaultDatabaseDSN     = "postgres://postgres:postgres@postgres:5432/praktikum?sslmode=disable"
 )
 
 type NetAddress struct {
