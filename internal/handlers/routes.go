@@ -25,16 +25,19 @@ func NewHandler(memStorage *store.MemStorage, fileStorage *store.FileStorage, db
 
 func (h *Handler) Init() *chi.Mux {
 	router := chi.NewRouter()
-
 	router.Use(middleware.Recoverer, h.WithLogging, GZip)
+	router.Group(func(r chi.Router) {
+		r.Post("/update/", h.UpdateMetricJSON)
+		r.Post("/value/", h.GetMetricJSON)
+		r.Post("/update/{metricType}/{metricName}/{metricValue}", h.MetricHandler)
+		r.Get("/value/{metricType}/{metricName}", h.GetMetricValue)
+		r.Get("/", h.GetAllMetrics)
+	})
 
-	router.Post("/update/", h.UpdateMetricJSON)
-	router.Post("/value/", h.GetMetricJSON)
-	router.Post("/update/{metricType}/{metricName}/{metricValue}", h.MetricHandler)
-	router.Get("/value/{metricType}/{metricName}", h.GetMetricValue)
-	router.Get("/", h.GetAllMetrics)
-
-	router.Get("/ping", h.Ping)
+	router.Group(func(r chi.Router) {
+		r.Use(h.DatabaseConnectionCheck)
+		r.Get("/ping", h.Ping)
+	})
 
 	router.MethodNotAllowed(CheckHTTPMethod(router))
 

@@ -56,7 +56,7 @@ func GetServerConfigs() (*ServerConfig, error) {
 	}
 
 	// if all values are not nil return cfg
-	if cfg.ServerAddress != "" && cfg.StoreInterval != 0 && cfg.FileStoragePath != "" && cfg.DatabaseDSN != "" {
+	if cfg.ServerAddress != "" && cfg.StoreInterval != 0 && cfg.FileStoragePath != "" {
 		return cfg, cfg.Validate()
 	}
 
@@ -90,8 +90,8 @@ func (s *ServerConfig) Validate() error {
 		return errors.New("invalid Store Interval")
 	case s.FileStoragePath == "":
 		return errors.New("invalid File Storage Path")
-	case s.DatabaseDSN == "":
-		return errors.New("invalid Database Source Name")
+		//case s.DatabaseDSN == "":
+		//	return errors.New("invalid Database Source Name")
 	}
 
 	return nil
