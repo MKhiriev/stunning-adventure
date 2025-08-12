@@ -25,7 +25,7 @@ func NewHandler(memStorage *store.MemStorage, fileStorage *store.FileStorage, db
 
 func (h *Handler) Init() *chi.Mux {
 	router := chi.NewRouter()
-	router.Use(middleware.Recoverer, h.WithLogging, GZip)
+	router.Use(middleware.Recoverer, h.WithLogging, GZip, WithContext)
 	router.Group(func(r chi.Router) {
 		r.Post("/update/", h.UpdateMetricJSON)
 		r.Post("/value/", h.GetMetricJSON)
