@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"github.com/MKhiriev/stunning-adventure/models"
 	"github.com/go-chi/chi/v5"
@@ -31,7 +32,7 @@ func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 	var err error
 	// 3. Update metric's value based on it's type - first you need to do it ugly
 	if metricFromBody.MType == models.Gauge {
-		metricFromBody, err = h.memStorage.UpdateGauge(metricFromBody)
+		metricFromBody, err = h.memStorage.UpdateGauge(context.TODO(), metricFromBody)
 		if err != nil {
 			h.logger.Err(err).Caller().Str("func", "*Handler.UpdateMetricJSON").Msg("error occurred during gauge metric update")
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -46,7 +47,7 @@ func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := h.fileStorage.SaveMetricsToFile(h.memStorage.GetAllMetrics()); err != nil {
+	if err := h.fileStorage.SaveMetricsToFile(context.TODO(), h.memStorage.GetAllMetrics(context.TODO())); err != nil {
 		h.logger.Err(err).Caller().Str("func", "*Handler.UpdateMetricJSON").Msg("error occurred during metrics save to file")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
@@ -87,7 +88,7 @@ func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 3. Find metric in memory
-	foundMetric, ok := h.memStorage.GetMetricByNameAndType(metricFromBodyWithoutValue.ID, metricFromBodyWithoutValue.MType)
+	foundMetric, ok := h.memStorage.GetMetricByNameAndType(context.TODO(), metricFromBodyWithoutValue.ID, metricFromBodyWithoutValue.MType)
 
 	if !ok {
 		h.logger.Info().Caller().Str("func", "*Handler.GetMetricJSON").Any("metric to find", metricFromBodyWithoutValue).Msg("metric not found")
@@ -161,14 +162,14 @@ func (h *Handler) HandleGauge(w http.ResponseWriter, metricValue string, metricN
 		Value: &gaugeValue,
 	}
 
-	_, err := h.memStorage.UpdateGauge(gaugeMetricToSave)
+	_, err := h.memStorage.UpdateGauge(context.TODO(), gaugeMetricToSave)
 	if err != nil {
 		h.logger.Err(err).Caller().Str("func", "*Handler.HandleGauge").Msg("error during updating gauge metric")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
-	err = h.fileStorage.SaveMetricsToFile(h.memStorage.GetAllMetrics())
+	err = h.fileStorage.SaveMetricsToFile(context.TODO(), h.memStorage.GetAllMetrics(context.TODO()))
 	if err != nil {
 		h.logger.Err(err).Caller().Str("func", "*Handler.HandleGauge").Msg("error during saving all metrics to file")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -199,7 +200,7 @@ func (h *Handler) HandleCounter(w http.ResponseWriter, metricValue string, metri
 		return
 	}
 
-	err = h.fileStorage.SaveMetricsToFile(h.memStorage.GetAllMetrics())
+	err = h.fileStorage.SaveMetricsToFile(context.TODO(), h.memStorage.GetAllMetrics(context.TODO()))
 	if err != nil {
 		h.logger.Err(err).Caller().Str("func", "*Handler.HandleCounter").Msg("error during saving all metrics to file")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -227,7 +228,7 @@ func (h *Handler) GetMetricValue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	metric, isMetricFound := h.memStorage.GetMetricByNameAndType(metricName, metricType)
+	metric, isMetricFound := h.memStorage.GetMetricByNameAndType(context.TODO(), metricName, metricType)
 
 	// if metric is present
 	if isMetricFound {
@@ -251,7 +252,7 @@ func (h *Handler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	allMetrics := h.memStorage.GetAllMetrics()
+	allMetrics := h.memStorage.GetAllMetrics(context.TODO())
 	type HTMLMetric struct {
 		ID    string
 		MType string

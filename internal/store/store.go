@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"errors"
 	"github.com/MKhiriev/stunning-adventure/models"
 	"maps"
@@ -9,11 +10,12 @@ import (
 )
 
 type MetricsStorage interface {
-	AddCounter(models.Metrics) (models.Metrics, error)
-	UpdateGauge(models.Metrics) (models.Metrics, error)
-	GetMetricByNameAndType(metricName string, metricType string) (models.Metrics, bool)
-	GetAllMetrics() []models.Metrics
+	AddCounter(context.Context, models.Metrics) (models.Metrics, error)
+	UpdateGauge(context.Context, models.Metrics) (models.Metrics, error)
+	GetMetricByNameAndType(ctx context.Context, metricName string, metricType string) (models.Metrics, bool)
+	GetAllMetrics(context.Context) []models.Metrics
 }
+
 type MemStorage struct {
 	Memory map[string]models.Metrics `json:"metrics"`
 	mu     *sync.Mutex
@@ -36,13 +38,6 @@ func (m *MemStorage) AddCounter(metrics models.Metrics) (models.Metrics, error) 
 	val, ok := m.Memory[metrics.ID]
 	// if metric name exists in storage - apply Counter logic
 	if ok {
-		// commented code was added because of increment's 1 rule:
-		// 		`- Тип `counter`, `int64` — новое значение должно добавляться к предыдущему,
-		//		если какое-то значение уже было известно серверу.`
-		//newDelta := *val.Delta + *metrics.Delta
-		//val.Delta = &newDelta
-
-		// add previous counter value with new value from agent
 		newDelta := *val.Delta + *metrics.Delta
 		val.Delta = &newDelta
 
@@ -57,7 +52,7 @@ func (m *MemStorage) AddCounter(metrics models.Metrics) (models.Metrics, error) 
 	return result, nil
 }
 
-func (m *MemStorage) UpdateGauge(metrics models.Metrics) (models.Metrics, error) {
+func (m *MemStorage) UpdateGauge(ctx context.Context, metrics models.Metrics) (models.Metrics, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -82,7 +77,7 @@ func (m *MemStorage) UpdateGauge(metrics models.Metrics) (models.Metrics, error)
 	return result, nil
 }
 
-func (m *MemStorage) GetMetricByNameAndType(metricName string, metricType string) (models.Metrics, bool) {
+func (m *MemStorage) GetMetricByNameAndType(ctx context.Context, metricName string, metricType string) (models.Metrics, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -97,7 +92,7 @@ func (m *MemStorage) GetMetricByNameAndType(metricName string, metricType string
 	return models.Metrics{}, false
 }
 
-func (m *MemStorage) GetAllMetrics() []models.Metrics {
+func (m *MemStorage) GetAllMetrics(ctx context.Context) []models.Metrics {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

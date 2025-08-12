@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"encoding/json"
 	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/models"
@@ -9,8 +10,8 @@ import (
 )
 
 type MetricsFileStorage interface {
-	SaveMetricsToFile([]models.Metrics) error
-	LoadMetricsFromFile() ([]models.Metrics, error)
+	SaveMetricsToFile(context.Context, []models.Metrics) error
+	LoadMetricsFromFile() (context.Context, []models.Metrics, error)
 }
 
 type FileStorage struct {
@@ -40,7 +41,7 @@ func NewFileStorage(memStorage *MemStorage, cfg *config.ServerConfig) *FileStora
 	return fs
 }
 
-func (fs *FileStorage) SaveMetricsToFile(allMetrics []models.Metrics) error {
+func (fs *FileStorage) SaveMetricsToFile(ctx context.Context, allMetrics []models.Metrics) error {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
