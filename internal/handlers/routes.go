@@ -1,25 +1,23 @@
 package handlers
 
 import (
-	"github.com/MKhiriev/stunning-adventure/internal/store"
+	"github.com/MKhiriev/stunning-adventure/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/zerolog"
 )
 
 type Handler struct {
-	memStorage  *store.MemStorage
-	fileStorage *store.FileStorage
-	logger      *zerolog.Logger
-	db          *store.DB
+	logger         *zerolog.Logger
+	metricsService service.MetricsSaverService
+	dbPingService  service.PingService
 }
 
-func NewHandler(memStorage *store.MemStorage, fileStorage *store.FileStorage, db *store.DB, logger *zerolog.Logger) *Handler {
+func NewHandler(metricsService service.MetricsSaverService, dbPingService service.PingService, logger *zerolog.Logger) *Handler {
 	return &Handler{
-		memStorage:  memStorage,
-		fileStorage: fileStorage,
-		logger:      logger,
-		db:          db,
+		logger:         logger,
+		metricsService: metricsService,
+		dbPingService:  dbPingService,
 	}
 }
 

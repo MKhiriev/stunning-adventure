@@ -5,6 +5,7 @@ import (
 	"github.com/MKhiriev/stunning-adventure/internal/handlers"
 	"github.com/MKhiriev/stunning-adventure/internal/logger"
 	"github.com/MKhiriev/stunning-adventure/internal/server"
+	"github.com/MKhiriev/stunning-adventure/internal/service"
 	"github.com/MKhiriev/stunning-adventure/internal/store"
 	"github.com/rs/zerolog/log"
 )
@@ -28,7 +29,14 @@ func main() {
 		log.Err(err).Msg("file storage creation failed")
 	}
 
-	handler := handlers.NewHandler(memStorage, fileStorage, conn, log)
+	metricsService, err := service.NewMetricsService(fileStorage, conn, memStorage, cfg, log)
+	if err != nil {
+		log.Err(err).Msg("creation of metrics service failed")
+		return
+	}
+	pingService := service.NewPingDBService(conn)
+
+	handler := handlers.NewHandler(metricsService, pingService, log)
 	myServer := new(server.Server)
 	myServer.ServerRun(handler.Init(), cfg)
 }

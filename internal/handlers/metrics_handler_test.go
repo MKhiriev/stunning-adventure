@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"github.com/MKhiriev/stunning-adventure/internal/config"
+	"github.com/MKhiriev/stunning-adventure/internal/service"
 	"github.com/MKhiriev/stunning-adventure/internal/store"
 	"github.com/MKhiriev/stunning-adventure/models"
 	"github.com/rs/zerolog"
@@ -132,16 +133,18 @@ func TestGetValueFromMetric(t *testing.T) {
 func initHandler() *Handler {
 	logger := zerolog.New(os.Stdout).With().Logger()
 	cfg := &config.ServerConfig{
-		ServerAddress:          "localhost:8080",
-		StoreInterval:          300,
-		FileStoragePath:        "tmp",
+		ServerAddress: "localhost:8080",
+		StoreInterval: 300,
+		//FileStoragePath:        "tmp",
 		RestoreMetricsFromFile: false,
 	}
 	memStorage := store.NewMemStorage(&logger)
 	fileStorage, _ := store.NewFileStorage(memStorage, cfg, &logger)
 	db := store.DB{}
+	metricsService, _ := service.NewMetricsService(fileStorage, &db, memStorage, cfg, &logger)
+	dbPingService := service.NewPingDBService(&db)
 
-	return NewHandler(memStorage, fileStorage, &db, &logger)
+	return NewHandler(metricsService, dbPingService, &logger)
 }
 
 func mDelta(v int) *int64 {
