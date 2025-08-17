@@ -9,11 +9,6 @@ import (
 	"path"
 )
 
-type MetricsFileStorage interface {
-	SaveMetricsToFile(context.Context, []models.Metrics) error
-	LoadMetricsFromFile() (context.Context, []models.Metrics, error)
-}
-
 type FileStorage struct {
 	cfg *config.ServerConfig
 	*MemStorage

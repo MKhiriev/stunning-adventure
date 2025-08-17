@@ -9,13 +9,6 @@ import (
 	"sync"
 )
 
-type MetricsStorage interface {
-	AddCounter(context.Context, models.Metrics) (models.Metrics, error)
-	UpdateGauge(context.Context, models.Metrics) (models.Metrics, error)
-	GetMetricByNameAndType(ctx context.Context, metricName string, metricType string) (models.Metrics, bool)
-	GetAllMetrics(context.Context) []models.Metrics
-}
-
 type MemStorage struct {
 	Memory map[string]models.Metrics `json:"metrics"`
 	mu     *sync.Mutex
