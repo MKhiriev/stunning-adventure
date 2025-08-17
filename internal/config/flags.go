@@ -13,10 +13,9 @@ const (
 	defaultReportInterval  = int64(5)
 	defaultServerAddress   = "localhost:8080"
 	defaultStoreInterval   = int64(300)
-	defaultFileStoragePath = "tmp"
-	defaultRestoreValue    = true
-	//defaultDatabaseDSN     = "postgres://postgres:postgres@postgres:5432/praktikum?sslmode=disable"
-	defaultDatabaseDSN = ""
+	defaultFileStoragePath = ""
+	defaultRestoreValue    = false
+	defaultDatabaseDSN     = ""
 )
 
 type NetAddress struct {
