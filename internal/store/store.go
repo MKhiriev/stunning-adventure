@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/MKhiriev/stunning-adventure/models"
+	"github.com/rs/zerolog"
 	"maps"
 	"slices"
 	"sync"
@@ -12,13 +13,14 @@ import (
 type MemStorage struct {
 	Memory map[string]models.Metrics `json:"metrics"`
 	mu     *sync.Mutex
+	log    *zerolog.Logger
 }
 
-func NewMemStorage() *MemStorage {
-	return &MemStorage{Memory: make(map[string]models.Metrics), mu: &sync.Mutex{}}
+func NewMemStorage(log *zerolog.Logger) *MemStorage {
+	return &MemStorage{Memory: make(map[string]models.Metrics), mu: &sync.Mutex{}, log: log}
 }
 
-func (m *MemStorage) AddCounter(metrics models.Metrics) (models.Metrics, error) {
+func (m *MemStorage) AddCounter(ctx context.Context, metrics models.Metrics) (models.Metrics, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -90,4 +92,44 @@ func (m *MemStorage) GetAllMetrics(ctx context.Context) []models.Metrics {
 	defer m.mu.Unlock()
 
 	return slices.Collect(maps.Values(m.Memory))
+}
+
+func (m *MemStorage) Save(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
+	switch metric.MType {
+	case models.Counter:
+		return m.AddCounter(ctx, metric)
+	case models.Gauge:
+		return m.UpdateGauge(ctx, metric)
+	default:
+		return metric, errors.New("unsupported metric type")
+	}
+}
+
+func (m *MemStorage) SaveAll(ctx context.Context, metrics []models.Metrics) error {
+	var err error
+	for _, metric := range metrics {
+		switch metric.MType {
+		case models.Counter:
+			_, err = m.AddCounter(ctx, metric)
+			if err != nil {
+				return err
+			}
+		case models.Gauge:
+			_, err = m.UpdateGauge(ctx, metric)
+			if err != nil {
+				return err
+			}
+		default:
+			return errors.New("unsupported metric type")
+		}
+	}
+	return nil
+}
+
+func (m *MemStorage) Get(ctx context.Context, metric models.Metrics) (models.Metrics, bool) {
+	return m.GetMetricByNameAndType(ctx, metric.ID, metric.MType)
+}
+
+func (m *MemStorage) GetAll(ctx context.Context) ([]models.Metrics, error) {
+	return m.GetAllMetrics(ctx), nil
 }

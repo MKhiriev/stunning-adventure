@@ -18,12 +18,16 @@ func main() {
 	log := logger.NewLogger("metrics-server")
 	log.Info().Any("cfg-srv", cfg).Msg("Server started")
 
+	memStorage := store.NewMemStorage(log)
 	conn, err := store.NewConnectPostgres(cfg, log)
 	if err != nil {
 		log.Err(err).Msg("connection to database failed")
 	}
-	memStorage := store.NewMemStorage()
-	fileStorage := store.NewFileStorage(memStorage, cfg)
+	fileStorage, err := store.NewFileStorage(memStorage, cfg, log)
+	if err != nil {
+		log.Err(err).Msg("file storage creation failed")
+	}
+
 	handler := handlers.NewHandler(memStorage, fileStorage, conn, log)
 	myServer := new(server.Server)
 	myServer.ServerRun(handler.Init(), cfg)

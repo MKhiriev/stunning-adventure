@@ -137,8 +137,8 @@ func initHandler() *Handler {
 		FileStoragePath:        "tmp",
 		RestoreMetricsFromFile: false,
 	}
-	memStorage := store.NewMemStorage()
-	fileStorage := store.NewFileStorage(memStorage, cfg)
+	memStorage := store.NewMemStorage(&logger)
+	fileStorage, _ := store.NewFileStorage(memStorage, cfg, &logger)
 	db := store.DB{}
 
 	return NewHandler(memStorage, fileStorage, &db, &logger)
