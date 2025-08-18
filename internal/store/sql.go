@@ -161,6 +161,7 @@ func (db *DB) Get(ctx context.Context, metric models.Metrics) (models.Metrics, b
 	}
 	defer stmt.Close()
 
+	db.logger.Info().Str("func", "*DB.Get").Any("metric to find", metric).Msg("trying to find metric")
 	// query row with given name and type
 	row := stmt.QueryRowContext(ctx, metric.ID, metric.MType)
 	// scan resulting row
