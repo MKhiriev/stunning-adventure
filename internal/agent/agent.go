@@ -193,7 +193,7 @@ func (m *MetricsAgent) Run() error {
 	utils.RunWithTicker(func() {
 		m.mu.Lock()
 		defer m.mu.Unlock()
-		err = m.SendBatchMetricsJSON()
+		err = m.SendMetricsJSON()
 	}, time.Duration(m.reportInterval)*time.Second)
 	if err != nil {
 		m.logger.Err(err).Caller().Str("func", "*MetricsAgent.Run").Msg("error occurred during running metrics-agent")
