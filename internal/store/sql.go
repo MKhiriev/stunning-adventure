@@ -15,14 +15,12 @@ const (
 	insertGaugeQuery = `INSERT INTO metrics (id, type, value)  
 VALUES ($1, $2, $3)  
 ON CONFLICT (id, type) DO  
-UPDATE SET value = $3  
-WHERE metrics.id = $1 AND metrics.type = $2
+UPDATE SET value = EXCLUDED.value  
 RETURNING *`
 	insertCounterQuery = `INSERT INTO metrics (id, type, delta)  
 VALUES ($1, $2, $3)  
 ON CONFLICT (id, type) DO  
-UPDATE SET delta = EXCLUDED.delta + $3  
-WHERE metrics.id = $1 AND metrics.type = $2
+UPDATE SET delta = metrics.delta + EXCLUDED.delta
 RETURNING *`
 )
 
