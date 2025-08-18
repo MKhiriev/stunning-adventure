@@ -16,11 +16,13 @@ const (
 VALUES ($1, $2, $3)  
 ON CONFLICT (id, type) DO  
 UPDATE SET value = $3  
+WHERE metrics.id = $1 AND metrics.type = $2
 RETURNING *`
 	insertCounterQuery = `INSERT INTO metrics (id, type, delta)  
 VALUES ($1, $2, $3)  
 ON CONFLICT (id, type) DO  
 UPDATE SET delta = EXCLUDED.delta + $3  
+WHERE metrics.id = $1 AND metrics.type = $2
 RETURNING *`
 )
 
@@ -117,24 +119,24 @@ func (db *DB) SaveAll(ctx context.Context, metrics []models.Metrics) error {
 	}
 
 	// for each metric
-	for _, metric := range metrics {
+	for idx, metric := range metrics {
 		// save metric
 		var result sql.Result
 		var statementExecutionError error
 		switch metric.MType {
 		case models.Gauge:
-			db.logger.Info().Str("func", "*DB.SaveAll").Any("gauge-metric", metric).Msg("trying to save gauge metric")
+			db.logger.Info().Str("func", "*DB.SaveAll").Any("gauge-metric", metric).Int("iteration", idx).Msg("trying to save gauge metric")
 			result, statementExecutionError = gaugeStmt.ExecContext(ctx, metric.ID, metric.MType, metric.Value)
 			if statementExecutionError != nil {
-				db.logger.Err(err).Str("func", "*DB.SaveAll").Any("gauge-metric", metric).Msg("error executing prepared UPSERT query for Gauge metric")
-				return err
+				db.logger.Err(statementExecutionError).Str("func", "*DB.SaveAll").Any("gauge-metric", metric).Int("iteration", idx).Msg("error executing prepared UPSERT query for Gauge metric")
+				return statementExecutionError
 			}
 		case models.Counter:
-			db.logger.Info().Str("func", "*DB.SaveAll").Any("counter-metric", metric).Msg("trying to save counter metric")
+			db.logger.Info().Str("func", "*DB.SaveAll").Any("counter-metric", metric).Int("iteration", idx).Msg("trying to save counter metric")
 			result, statementExecutionError = counterStmt.ExecContext(ctx, metric.ID, metric.MType, metric.Delta)
 			if statementExecutionError != nil {
-				db.logger.Err(err).Str("func", "*DB.SaveAll").Any("counter-metric", metric).Msg("error executing prepared UPSERT query for Counter metric")
-				return err
+				db.logger.Err(statementExecutionError).Str("func", "*DB.SaveAll").Any("counter-metric", metric).Int("iteration", idx).Msg("error executing prepared UPSERT query for Counter metric")
+				return statementExecutionError
 			}
 		default:
 			return errors.New("unsupported metric type was passed")
@@ -220,7 +222,7 @@ create table if not exists metrics
 (  
     id  text not null,   
     type  text not null,    
-    delta integer,    
+    delta bigint default null,    
     value double precision,    
     primary key (id, type)
 );`
