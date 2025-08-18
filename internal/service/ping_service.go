@@ -23,10 +23,10 @@ func (p *PingDBService) Ping(ctx context.Context) error {
 }
 
 func NewPingDBService(db *store.DB, log *zerolog.Logger) (PingService, error) {
-	if db == nil {
-		log.Error().Str("func", "service.NewPingDBService").Msg("error during creation of PingDBService: db connection is nil")
-		return nil, errors.New("db connection is nil")
-	}
+	//if db == nil {
+	//	log.Error().Str("func", "service.NewPingDBService").Msg("error during creation of PingDBService: db connection is nil")
+	//	return nil, errors.New("db connection is nil")
+	//}
 
 	log.Info().Str("func", "service.NewPingDBService").Msg("PingDBService successfully created")
 	return &PingDBService{DB: db, log: log}, nil
