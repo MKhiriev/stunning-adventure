@@ -22,11 +22,11 @@ type CacheMetricsService struct {
 }
 
 func NewMetricsService(fileStorage *store.FileStorage, dbStorage *store.DB, cacheStorage *store.MemStorage, cfg *config.ServerConfig, log *zerolog.Logger) (MetricsSaverService, error) {
-	if cfg.DatabaseDSN != "" {
+	if cfg.DatabaseDSN != "" && dbStorage != nil {
 		return NewDatabaseMetricsService(dbStorage, log, cfg), nil
 	}
 
-	if cfg.FileStoragePath != "" && cacheStorage != nil {
+	if cfg.FileStoragePath != "" && fileStorage != nil && cacheStorage != nil {
 		return NewCacheMetricsService(cacheStorage, fileStorage, log, cfg), nil
 	}
 	if cacheStorage != nil {
