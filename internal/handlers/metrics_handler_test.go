@@ -142,7 +142,7 @@ func initHandler() *Handler {
 	fileStorage, _ := store.NewFileStorage(memStorage, cfg, &logger)
 	db := store.DB{}
 	metricsService, _ := service.NewMetricsService(fileStorage, &db, memStorage, cfg, &logger)
-	dbPingService := service.NewPingDBService(&db)
+	dbPingService, _ := service.NewPingDBService(&db, &logger)
 
 	return NewHandler(metricsService, dbPingService, &logger)
 }
