@@ -123,28 +123,26 @@ func (db *DB) SaveAll(ctx context.Context, metrics []models.Metrics) error {
 		var statementExecutionError error
 		switch metric.MType {
 		case models.Gauge:
+			db.logger.Info().Str("func", "*DB.SaveAll").Any("gauge-metric", metric).Msg("trying to save gauge metric")
 			result, statementExecutionError = gaugeStmt.ExecContext(ctx, metric.ID, metric.MType, metric.Value)
 			if statementExecutionError != nil {
-				db.logger.Err(err).Str("func", "*DB.SaveAll").Msg("error executing prepared UPSERT query for Gauge metric")
-				_ = tx.Rollback()
+				db.logger.Err(err).Str("func", "*DB.SaveAll").Any("gauge-metric", metric).Msg("error executing prepared UPSERT query for Gauge metric")
 				return err
 			}
 		case models.Counter:
+			db.logger.Info().Str("func", "*DB.SaveAll").Any("counter-metric", metric).Msg("trying to save counter metric")
 			result, statementExecutionError = counterStmt.ExecContext(ctx, metric.ID, metric.MType, metric.Delta)
 			if statementExecutionError != nil {
-				db.logger.Err(err).Str("func", "*DB.SaveAll").Msg("error executing prepared UPSERT query for Counter metric")
-				_ = tx.Rollback()
+				db.logger.Err(err).Str("func", "*DB.SaveAll").Any("counter-metric", metric).Msg("error executing prepared UPSERT query for Counter metric")
 				return err
 			}
 		default:
-			_ = tx.Rollback()
 			return errors.New("unsupported metric type was passed")
 		}
 
 		rowsAffected, _ := result.RowsAffected()
 		if rowsAffected == 0 {
 			db.logger.Err(err).Str("func", "*DB.SaveAll").Msg("metric was not updated")
-			_ = tx.Rollback()
 			return err
 		}
 	}
