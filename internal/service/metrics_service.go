@@ -22,17 +22,17 @@ type CacheMetricsService struct {
 }
 
 func NewMetricsService(fileStorage *store.FileStorage, dbStorage *store.DB, cacheStorage *store.MemStorage, cfg *config.ServerConfig, log *zerolog.Logger) (MetricsSaverService, error) {
-	if cfg.DatabaseDSN != "" {
+	if cfg.DatabaseDSN != "" && dbStorage != nil {
 		return NewDatabaseMetricsService(dbStorage, log, cfg)
 	}
-	if cfg.FileStoragePath != "" {
+	if cfg.FileStoragePath != "" && fileStorage != nil && cacheStorage != nil {
 		return NewCacheWithFileMetricsService(cacheStorage, fileStorage, log, cfg)
 	}
 	if cacheStorage != nil {
 		return NewCacheMetricsService(cacheStorage, log, cfg)
 	}
 
-	log.Error().Str("func", "service.NewMetricsService").Msg("error creating DatabaseMetricsService: nil db was provided")
+	log.Error().Str("func", "service.NewMetricsService").Msg("error creating metrics service: nil storage was provided")
 	return nil, errors.New("error creating DatabaseMetricsService: nil db was provided")
 }
 
