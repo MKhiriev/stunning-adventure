@@ -60,6 +60,48 @@ func (m *MetricsAgent) ReadMetrics() error {
 	return nil
 }
 
+func (m *MetricsAgent) SendBatchMetricsJSON() error {
+	// get all metrics from memory
+	allMetrics := m.memory.GetAllMetrics()
+	if len(allMetrics) == 0 {
+		m.logger.Error().Caller().Str("func", "*MetricsAgent.SendBatchMetricsJSON").Msg("no metrics retrieved from memory")
+		return errors.New("no metrics passed")
+	}
+
+	route, pathJoinError := url.JoinPath(m.serverAddress, m.route, "/")
+	if pathJoinError != nil {
+		m.logger.Err(pathJoinError).Caller().Str("func", "*MetricsAgent.SendBatchMetricsJSON").Msg("url join error")
+		return fmt.Errorf("url join error: %w", pathJoinError)
+	}
+
+	// gzip encode metrics
+	compressedMetrics, compressionError := gzipCompress(allMetrics...)
+	if compressionError != nil {
+		m.logger.Err(compressionError).Caller().Str("func", "*MetricsAgent.SendBatchMetricsJSON").Msg("error occurred during gzip compression")
+		return compressionError
+	}
+
+	// send all metrics batched retrieved from memory
+	_, sendMetricError := resty.New().R().
+		SetHeaders(map[string]string{
+			"Content-Type":     "application/json",
+			"Content-Encoding": "gzip",
+		}).
+		SetBody(compressedMetrics).
+		Post(route)
+	if sendMetricError != nil {
+		m.logger.Err(sendMetricError).Caller().Str("func", "*MetricsAgent.SendBatchMetricsJSON").Msg("error occurred during sending metric")
+		return fmt.Errorf("error occurred during sending metric: %w", sendMetricError)
+	}
+
+	m.logger.Info().Caller().Str("func", "*MetricsAgent.SendBatchMetricsJSON").Any("request body", compressedMetrics).Msg("request from agent")
+
+	// after sending metrics set poll count to 0
+	m.pollCount = 0
+
+	return nil
+}
+
 func (m *MetricsAgent) SendMetricsJSON() error {
 	// get all metrics from memory
 	allMetrics := m.memory.GetAllMetrics()
@@ -151,7 +193,7 @@ func (m *MetricsAgent) Run() error {
 	utils.RunWithTicker(func() {
 		m.mu.Lock()
 		defer m.mu.Unlock()
-		err = m.SendMetricsJSON()
+		err = m.SendBatchMetricsJSON()
 	}, time.Duration(m.reportInterval)*time.Second)
 	if err != nil {
 		m.logger.Err(err).Caller().Str("func", "*MetricsAgent.Run").Msg("error occurred during running metrics-agent")
@@ -238,11 +280,20 @@ func counterMetric(name string, value int64) models.Metrics {
 	}
 }
 
-func gzipCompress(metric models.Metrics) ([]byte, error) {
-	// сериализуем metric в JSON
-	jsonData, err := json.Marshal(metric)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal metric: %w", err)
+func gzipCompress(metrics ...models.Metrics) ([]byte, error) {
+	var jsonData []byte
+	var err error
+	// сериализуем metrics в JSON
+	if len(metrics) == 1 {
+		jsonData, err = json.Marshal(metrics[0])
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal metric: %w", err)
+		}
+	} else {
+		jsonData, err = json.Marshal(metrics)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal metric: %w", err)
+		}
 	}
 
 	// создаем gzip-сжатие
