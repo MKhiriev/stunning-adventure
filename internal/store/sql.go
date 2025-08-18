@@ -103,6 +103,7 @@ func (db *DB) SaveAll(ctx context.Context, metrics []models.Metrics) error {
 		db.logger.Err(err).Str("func", "*DB.SaveAll").Msg("error during opening transaction")
 		return fmt.Errorf("error during opening transaction: %w", err)
 	}
+	defer tx.Rollback()
 
 	gaugeStmt, err := tx.PrepareContext(ctx, insertGaugeQuery)
 	if err != nil {
@@ -149,9 +150,8 @@ func (db *DB) SaveAll(ctx context.Context, metrics []models.Metrics) error {
 	}
 
 	// commit transaction if all metrics are successfully updated
-	_ = tx.Commit()
 
-	return nil
+	return tx.Commit()
 }
 
 func (db *DB) Get(ctx context.Context, metric models.Metrics) (models.Metrics, bool) {
