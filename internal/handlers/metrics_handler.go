@@ -11,6 +11,40 @@ import (
 	"strconv"
 )
 
+func (h *Handler) BatchUpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
+	allowedMetricTypes := []string{models.Gauge, models.Counter}
+	var metricsFromBody []models.Metrics
+
+	// Get JSON from the body
+	if err := json.NewDecoder(r.Body).Decode(&metricsFromBody); err != nil {
+		h.logger.Err(err).Caller().Str("func", "*Handler.BatchUpdateMetricJSON").Msg("Invalid JSON was passed")
+		http.Error(w, "Invalid JSON was passed", http.StatusBadRequest)
+		return
+	}
+
+	h.logger.Info().Str("func", "*Handler.BatchUpdateMetricJSON").Interface("metric from body", metricsFromBody).Msg("BatchUpdateMetricJSON was called!")
+
+	for _, metric := range metricsFromBody {
+		// Check if metric from JSON is valid => if not - StatusBadRequest
+		if metric.ID == "" || metric.MType == "" || !slices.Contains(allowedMetricTypes, metric.MType) {
+			h.logger.Error().Caller().Str("func", "*Handler.BatchUpdateMetricJSON").Any("metric", metric).Msg("passed metric is not valid")
+			http.Error(w, "passed metric is not valid", http.StatusBadRequest)
+			return
+		}
+	}
+
+	// update all values
+	if err := h.metricsService.SaveAll(context.TODO(), metricsFromBody); err != nil {
+		h.logger.Err(err).Caller().Str("func", "*Handler.BatchUpdateMetricJSON").Msg("error occurred during metric update")
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	// 4. Set Content type to `application/json`
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+}
+
 func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 	allowedMetricTypes := []string{models.Gauge, models.Counter}
 	var metricFromBody models.Metrics
