@@ -34,7 +34,11 @@ func main() {
 		log.Err(err).Msg("creation of metrics service failed")
 		return
 	}
-	pingService := service.NewPingDBService(conn)
+	pingService, err := service.NewPingDBService(conn, log)
+	if err != nil {
+		log.Err(err).Msg("creation of ping db service failed")
+		return
+	}
 
 	handler := handlers.NewHandler(metricsService, pingService, log)
 	myServer := new(server.Server)
