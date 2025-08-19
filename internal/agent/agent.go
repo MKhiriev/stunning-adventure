@@ -30,20 +30,34 @@ type MetricsAgent struct {
 	pollInterval   int64
 	mu             *sync.Mutex
 	logger         *zerolog.Logger
+	retryIntervals map[int]time.Duration
 }
 
 func NewMetricsAgent(route string, cfg *config.AgentConfig, logger *zerolog.Logger) *MetricsAgent {
-	return &MetricsAgent{
+	agent := &MetricsAgent{
 		serverAddress:  "http://" + cfg.ServerAddress,
 		route:          route,
-		client:         resty.New(),
+		client:         newHttpClient(),
 		memory:         NewStorage(),
 		pollCount:      0,
 		reportInterval: cfg.ReportInterval,
 		pollInterval:   cfg.PollInterval,
 		logger:         logger,
 		mu:             &sync.Mutex{},
+		retryIntervals: map[int]time.Duration{
+			1: 1 * time.Second,
+			2: 3 * time.Second,
+			3: 5 * time.Second,
+		},
 	}
+
+	// add retry mechanism
+	agent.client.SetRetryCount(3).
+		SetRetryAfter(func(client *resty.Client, response *resty.Response) (time.Duration, error) {
+			return agent.retryIntervals[response.Request.Attempt], nil
+		}).SetRetryMaxWaitTime(5 * time.Second)
+
+	return agent
 }
 
 func (m *MetricsAgent) ReadMetrics() error {
@@ -82,7 +96,7 @@ func (m *MetricsAgent) SendBatchMetricsJSON() error {
 	}
 
 	// send all metrics batched retrieved from memory
-	_, sendMetricError := resty.New().R().
+	_, sendMetricError := m.client.R().
 		SetHeaders(map[string]string{
 			"Content-Type":     "application/json",
 			"Content-Encoding": "gzip",
@@ -125,7 +139,7 @@ func (m *MetricsAgent) SendMetricsJSON() error {
 			return compressionError
 		}
 
-		_, sendMetricError := resty.New().R().
+		_, sendMetricError := m.client.R().
 			SetHeaders(map[string]string{
 				"Content-Type":     "application/json",
 				"Content-Encoding": "gzip",
@@ -201,6 +215,10 @@ func (m *MetricsAgent) Run() error {
 	}
 
 	select {} // block main routine forever
+}
+
+func newHttpClient() *resty.Client {
+	return resty.New().SetDebug(false)
 }
 
 func (m *MetricsAgent) getSliceOfMetrics(memStats runtime.MemStats) []models.Metrics {
