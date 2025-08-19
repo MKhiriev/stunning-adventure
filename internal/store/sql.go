@@ -16,17 +16,21 @@ const (
 VALUES ($1, $2, $3)  
 ON CONFLICT (id, type) DO  
 UPDATE SET value = EXCLUDED.value  
-RETURNING *`
+RETURNING *;`
 	insertCounterQuery = `INSERT INTO metrics (id, type, delta)  
 VALUES ($1, $2, $3)  
 ON CONFLICT (id, type) DO  
 UPDATE SET delta = metrics.delta + EXCLUDED.delta
-RETURNING *`
+RETURNING *;`
+	getMetric     = `SELECT * FROM metrics WHERE id=$1 AND type=$2;`
+	getAllMetrics = `SELECT * FROM metrics;`
 )
 
 type DB struct {
 	*sql.DB
-	logger *zerolog.Logger
+	logger        *zerolog.Logger
+	insertGauge   *sql.Stmt
+	insertCounter *sql.Stmt
 }
 
 func NewConnectPostgres(cfg *config.ServerConfig, log *zerolog.Logger) (*DB, error) {
@@ -154,7 +158,7 @@ func (db *DB) SaveAll(ctx context.Context, metrics []models.Metrics) error {
 
 func (db *DB) Get(ctx context.Context, metric models.Metrics) (models.Metrics, bool) {
 	// prepare context
-	stmt, err := db.PrepareContext(ctx, "SELECT * FROM metrics WHERE id=$1 AND type=$2")
+	stmt, err := db.PrepareContext(ctx, getMetric)
 	if err != nil {
 		db.logger.Err(err).Str("func", "*DB.Get").Msg("error during preparing context")
 		return models.Metrics{}, false
@@ -181,7 +185,7 @@ func (db *DB) Get(ctx context.Context, metric models.Metrics) (models.Metrics, b
 
 // TODO test function
 func (db *DB) GetAll(ctx context.Context) ([]models.Metrics, error) {
-	stmt, err := db.PrepareContext(ctx, "SELECT * FROM metrics")
+	stmt, err := db.PrepareContext(ctx, getAllMetrics)
 	if err != nil {
 		db.logger.Err(err).Str("func", "*DB.GetAll").Msg("error during preparing context")
 		return nil, err
