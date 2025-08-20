@@ -37,7 +37,7 @@ func NewMetricsAgent(route string, cfg *config.AgentConfig, logger *zerolog.Logg
 	agent := &MetricsAgent{
 		serverAddress:  "http://" + cfg.ServerAddress,
 		route:          route,
-		client:         newHttpClient(),
+		client:         newHTTPClient(),
 		memory:         NewStorage(),
 		pollCount:      0,
 		reportInterval: cfg.ReportInterval,
@@ -217,7 +217,7 @@ func (m *MetricsAgent) Run() error {
 	select {} // block main routine forever
 }
 
-func newHttpClient() *resty.Client {
+func newHTTPClient() *resty.Client {
 	return resty.New().SetDebug(false)
 }
 
