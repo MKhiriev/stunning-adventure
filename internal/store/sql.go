@@ -12,15 +12,12 @@ import (
 )
 
 const (
-	insertGaugeQuery = `INSERT INTO metrics (id, type, value)  
-VALUES ($1, $2, $3)  
-ON CONFLICT (id, type) DO  
-UPDATE SET value = EXCLUDED.value  
-RETURNING *;`
-	insertCounterQuery = `INSERT INTO metrics (id, type, delta)  
-VALUES ($1, $2, $3)  
-ON CONFLICT (id, type) DO  
-UPDATE SET delta = metrics.delta + EXCLUDED.delta
+	insertMetricsQuery = `INSERT INTO metrics (id, type, delta, value) 
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (id, type) DO 
+UPDATE SET 
+           value = EXCLUDED.value,
+           delta = metrics.delta + EXCLUDED.delta
 RETURNING *;`
 	getMetric     = `SELECT * FROM metrics WHERE id=$1 AND type=$2;`
 	getAllMetrics = `SELECT * FROM metrics;`
@@ -28,9 +25,7 @@ RETURNING *;`
 
 type DB struct {
 	*sql.DB
-	logger        *zerolog.Logger
-	insertGauge   *sql.Stmt
-	insertCounter *sql.Stmt
+	logger *zerolog.Logger
 }
 
 func NewConnectPostgres(cfg *config.ServerConfig, log *zerolog.Logger) (*DB, error) {
@@ -43,14 +38,15 @@ func NewConnectPostgres(cfg *config.ServerConfig, log *zerolog.Logger) (*DB, err
 	}
 	err = conn.PingContext(ctx)
 	if err != nil {
-		log.Err(err).Msg("error connecting database (ping)")
+		log.Err(err).Str("func", "NewConnectPostgres").Msg("error connecting database (ping)")
 		return nil, err
 	}
-	log.Info().Msg("connected to database successfully")
+	log.Info().Str("func", "NewConnectPostgres").Msg("connected to database successfully")
 	// construct a DB struct
 	db := &DB{DB: conn, logger: log}
 
 	if err := db.Migrate(ctx); err != nil {
+		log.Err(err).Str("func", "NewConnectPostgres").Msg("failed migration")
 		// if there is no `metrics` table then there is no need to use db
 		return nil, err
 	}
@@ -58,40 +54,32 @@ func NewConnectPostgres(cfg *config.ServerConfig, log *zerolog.Logger) (*DB, err
 	return db, nil
 }
 
-// TODO test function
 func (db *DB) Save(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
-	// get query for UPSERT of metrics value
-	query, err := db.insertQuery(&metric)
-	if err != nil {
-		db.logger.Err(err).Str("func", "*DB.Save").Msg("error during preparing query for UPSERT operation")
-		return models.Metrics{}, err
-	}
-
-	// prepare context
-	stmt, err := db.PrepareContext(ctx, query)
-	if err != nil {
-		db.logger.Err(err).Str("func", "*DB.Save").Str("query", query).Msg("error during preparing context")
-		return models.Metrics{}, err
-	}
-	defer stmt.Close()
-
 	var row *sql.Row
 	// execute UPSERT query
 	// query also returns updated row values
 	switch metric.MType {
 	case models.Gauge:
-		row = stmt.QueryRowContext(ctx, metric.ID, metric.MType, metric.Value)
+		row = db.QueryRowContext(ctx, metric.ID, metric.MType, metric.Value)
 	case models.Counter:
-		row = stmt.QueryRowContext(ctx, metric.ID, metric.MType, metric.Delta)
+		row = db.QueryRowContext(ctx, metric.ID, metric.MType, metric.Delta)
 	}
 
-	if row == nil {
-		db.logger.Err(err).Str("func", "*DB.Save").Msg("error: row is nil")
-		return models.Metrics{}, nil
+	if metric.MType == models.Gauge || metric.MType == models.Counter {
+		db.logger.Info().Str("func", "*DB.Save").Any("metric", metric).Msg("trying to save metric")
+		row = db.QueryRowContext(ctx, insertMetricsQuery, metric.ID, metric.MType, metric.Delta, metric.Value)
+
+		if row == nil {
+			db.logger.Error().Str("func", "*DB.Save").Msg("error: row is nil")
+			return models.Metrics{}, nil
+		}
+	} else {
+		db.logger.Error().Str("func", "*DB.SaveAll").Any("metric", metric).Msg("unsupported metric type was passed")
+		return models.Metrics{}, errors.New("unsupported metric type was passed")
 	}
 
 	// scan resulting values from query
-	if err = row.Scan(&metric.ID, &metric.MType, &metric.Delta, &metric.Value); err != nil {
+	if err := row.Scan(&metric.ID, &metric.MType, &metric.Delta, &metric.Value); err != nil {
 		db.logger.Err(err).Str("func", "*DB.Save").Msg("error during scanning row")
 		return models.Metrics{}, err
 	}
@@ -99,7 +87,6 @@ func (db *DB) Save(ctx context.Context, metric models.Metrics) (models.Metrics, 
 	return metric, nil
 }
 
-// TODO test function
 func (db *DB) SaveAll(ctx context.Context, metrics []models.Metrics) error {
 	// begin transaction
 	tx, err := db.BeginTx(ctx, nil)
@@ -109,38 +96,28 @@ func (db *DB) SaveAll(ctx context.Context, metrics []models.Metrics) error {
 	}
 	defer tx.Rollback()
 
-	gaugeStmt, err := tx.PrepareContext(ctx, insertGaugeQuery)
+	// prepare context
+	stmt, err := tx.PrepareContext(ctx, insertMetricsQuery)
 	if err != nil {
-		db.logger.Err(err).Str("func", "*DB.SaveAll").Msg("error creating transaction statement for Gauge UPSERT")
-		return fmt.Errorf("error creating transaction statement for Gauge UPSERT: %w", err)
+		db.logger.Err(err).Str("func", "*DB.SaveAll").Msg("error during preparing context")
+		return err
 	}
-	counterStmt, err := tx.PrepareContext(ctx, insertCounterQuery)
-	if err != nil {
-		db.logger.Err(err).Str("func", "*DB.SaveAll").Msg("error creating transaction statement for Counter UPSERT")
-		return fmt.Errorf("error creating transaction statement for Counter UPSERT: %w", err)
-	}
+	defer stmt.Close()
 
 	// for each metric
 	for idx, metric := range metrics {
 		// save metric
 		var result sql.Result
 		var statementExecutionError error
-		switch metric.MType {
-		case models.Gauge:
-			db.logger.Info().Str("func", "*DB.SaveAll").Any("gauge-metric", metric).Int("iteration", idx).Msg("trying to save gauge metric")
-			result, statementExecutionError = gaugeStmt.ExecContext(ctx, metric.ID, metric.MType, metric.Value)
+		if metric.MType == models.Gauge || metric.MType == models.Counter {
+			db.logger.Info().Str("func", "*DB.SaveAll").Any("metric", metric).Int("iteration", idx).Msg("trying to save metric")
+			result, statementExecutionError = stmt.ExecContext(ctx, metric.ID, metric.MType, metric.Delta, metric.Value)
 			if statementExecutionError != nil {
-				db.logger.Err(statementExecutionError).Str("func", "*DB.SaveAll").Any("gauge-metric", metric).Int("iteration", idx).Msg("error executing prepared UPSERT query for Gauge metric")
+				db.logger.Err(statementExecutionError).Str("func", "*DB.SaveAll").Any("metric", metric).Int("iteration", idx).Msg("error executing prepared UPSERT query for saving metric")
 				return statementExecutionError
 			}
-		case models.Counter:
-			db.logger.Info().Str("func", "*DB.SaveAll").Any("counter-metric", metric).Int("iteration", idx).Msg("trying to save counter metric")
-			result, statementExecutionError = counterStmt.ExecContext(ctx, metric.ID, metric.MType, metric.Delta)
-			if statementExecutionError != nil {
-				db.logger.Err(statementExecutionError).Str("func", "*DB.SaveAll").Any("counter-metric", metric).Int("iteration", idx).Msg("error executing prepared UPSERT query for Counter metric")
-				return statementExecutionError
-			}
-		default:
+		} else {
+			db.logger.Error().Str("func", "*DB.SaveAll").Any("metric", metric).Int("iteration", idx).Msg("unsupported metric type was passed")
 			return errors.New("unsupported metric type was passed")
 		}
 
@@ -157,19 +134,11 @@ func (db *DB) SaveAll(ctx context.Context, metrics []models.Metrics) error {
 }
 
 func (db *DB) Get(ctx context.Context, metric models.Metrics) (models.Metrics, bool) {
-	// prepare context
-	stmt, err := db.PrepareContext(ctx, getMetric)
-	if err != nil {
-		db.logger.Err(err).Str("func", "*DB.Get").Msg("error during preparing context")
-		return models.Metrics{}, false
-	}
-	defer stmt.Close()
-
 	db.logger.Info().Str("func", "*DB.Get").Any("metric to find", metric).Msg("trying to find metric")
 	// query row with given name and type
-	row := stmt.QueryRowContext(ctx, metric.ID, metric.MType)
+	row := db.QueryRowContext(ctx, getMetric, metric.ID, metric.MType)
 	// scan resulting row
-	err = row.Scan(&metric.ID, &metric.MType, &metric.Delta, &metric.Value)
+	err := row.Scan(&metric.ID, &metric.MType, &metric.Delta, &metric.Value)
 	// check for error type
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
@@ -183,16 +152,8 @@ func (db *DB) Get(ctx context.Context, metric models.Metrics) (models.Metrics, b
 	}
 }
 
-// TODO test function
 func (db *DB) GetAll(ctx context.Context) ([]models.Metrics, error) {
-	stmt, err := db.PrepareContext(ctx, getAllMetrics)
-	if err != nil {
-		db.logger.Err(err).Str("func", "*DB.GetAll").Msg("error during preparing context")
-		return nil, err
-	}
-	defer stmt.Close()
-
-	rows, err := stmt.QueryContext(ctx)
+	rows, err := db.QueryContext(ctx, getAllMetrics)
 	if err != nil {
 		db.logger.Err(err).Str("func", "*DB.GetAll").Msg("error during query execution")
 		return nil, err
@@ -235,15 +196,4 @@ create table if not exists metrics
 	}
 
 	return nil
-}
-
-func (db *DB) insertQuery(metric *models.Metrics) (string, error) {
-	switch metric.MType {
-	case models.Gauge:
-		return insertGaugeQuery, nil
-	case models.Counter:
-		return insertCounterQuery, nil
-	default:
-		return "", errors.New("no query for given metric type")
-	}
 }
