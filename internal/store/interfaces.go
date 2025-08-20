@@ -27,3 +27,10 @@ type MetricsCacheStorage interface {
 type MetricsDatabaseStorage interface {
 	Migrate(context.Context) error
 }
+
+// ErrorClassification тип для классификации ошибок
+type ErrorClassification int
+
+type ErrorClassificator interface {
+	Classify(err error) ErrorClassification
+}
