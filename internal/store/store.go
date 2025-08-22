@@ -3,11 +3,12 @@ package store
 import (
 	"context"
 	"errors"
-	"github.com/MKhiriev/stunning-adventure/models"
-	"github.com/rs/zerolog"
 	"maps"
 	"slices"
 	"sync"
+
+	"github.com/MKhiriev/stunning-adventure/models"
+	"github.com/rs/zerolog"
 )
 
 type MemStorage struct {

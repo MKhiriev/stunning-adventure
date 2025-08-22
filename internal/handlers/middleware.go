@@ -1,10 +1,11 @@
 package handlers
 
 import (
-	"github.com/go-chi/chi/v5"
-	"golang.org/x/net/context"
 	"net/http"
 	"time"
+
+	"github.com/go-chi/chi/v5"
+	"golang.org/x/net/context"
 )
 
 const timeout = 10 * time.Second

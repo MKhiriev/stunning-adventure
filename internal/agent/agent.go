@@ -6,11 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/MKhiriev/stunning-adventure/internal/config"
-	"github.com/MKhiriev/stunning-adventure/internal/utils"
-	"github.com/MKhiriev/stunning-adventure/models"
-	"github.com/go-resty/resty/v2"
-	"github.com/rs/zerolog"
 	"math/rand/v2"
 	"net/http"
 	"net/url"
@@ -18,6 +13,12 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/MKhiriev/stunning-adventure/internal/config"
+	"github.com/MKhiriev/stunning-adventure/internal/utils"
+	"github.com/MKhiriev/stunning-adventure/models"
+	"github.com/go-resty/resty/v2"
+	"github.com/rs/zerolog"
 )
 
 type MetricsAgent struct {

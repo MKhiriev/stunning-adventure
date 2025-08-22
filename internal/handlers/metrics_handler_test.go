@@ -1,6 +1,12 @@
 package handlers
 
 import (
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"testing"
+
 	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/internal/service"
 	"github.com/MKhiriev/stunning-adventure/internal/store"
@@ -8,11 +14,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"io"
-	"net/http"
-	"net/http/httptest"
-	"os"
-	"testing"
 )
 
 func TestMetricHandler(t *testing.T) {

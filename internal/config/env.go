@@ -2,8 +2,9 @@ package config
 
 import (
 	"errors"
-	"github.com/caarlos0/env/v11"
 	"log"
+
+	"github.com/caarlos0/env/v11"
 )
 
 type AgentConfig struct {

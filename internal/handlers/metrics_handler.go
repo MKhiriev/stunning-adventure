@@ -3,12 +3,13 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"github.com/MKhiriev/stunning-adventure/models"
-	"github.com/go-chi/chi/v5"
 	"html/template"
 	"net/http"
 	"slices"
 	"strconv"
+
+	"github.com/MKhiriev/stunning-adventure/models"
+	"github.com/go-chi/chi/v5"
 )
 
 func (h *Handler) BatchUpdateMetricJSON(w http.ResponseWriter, r *http.Request) {

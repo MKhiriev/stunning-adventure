@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+
 	"github.com/MKhiriev/stunning-adventure/internal/store"
 	"github.com/rs/zerolog"
 )

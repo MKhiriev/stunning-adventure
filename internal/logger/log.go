@@ -1,10 +1,11 @@
 package logger
 
 import (
-	"github.com/rs/zerolog"
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"github.com/rs/zerolog"
 )
 
 func NewLogger(role string) *zerolog.Logger {
