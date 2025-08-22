@@ -7,40 +7,39 @@ import (
 	"github.com/MKhiriev/stunning-adventure/internal/server"
 	"github.com/MKhiriev/stunning-adventure/internal/service"
 	"github.com/MKhiriev/stunning-adventure/internal/store"
-	"github.com/rs/zerolog/log"
 )
 
 func main() {
+	log := logger.NewLogger("metrics-server")
 	cfg, err := config.GetServerConfigs()
 	if err != nil {
 		log.Err(err).Msg("invalid server configuration was passed")
 		return
 	}
-	zeroLogger := logger.NewLogger("metrics-server")
-	zeroLogger.Info().Any("cfg-srv", cfg).Msg("Server started")
+	log.Info().Any("cfg-srv", cfg).Msg("Server started")
 
-	memStorage := store.NewMemStorage(zeroLogger)
-	conn, err := store.NewConnectPostgres(cfg, zeroLogger)
+	memStorage := store.NewMemStorage(log)
+	conn, err := store.NewConnectPostgres(cfg, log)
 	if err != nil {
-		zeroLogger.Err(err).Msg("connection to database failed")
+		log.Err(err).Msg("connection to database failed")
 	}
-	fileStorage, err := store.NewFileStorage(memStorage, cfg, zeroLogger)
+	fileStorage, err := store.NewFileStorage(memStorage, cfg, log)
 	if err != nil {
-		zeroLogger.Err(err).Msg("file storage creation failed")
+		log.Err(err).Msg("file storage creation failed")
 	}
 
-	metricsService, err := service.NewMetricsService(fileStorage, conn, memStorage, cfg, zeroLogger)
+	metricsService, err := service.NewMetricsService(fileStorage, conn, memStorage, cfg, log)
 	if err != nil {
-		zeroLogger.Err(err).Msg("creation of metrics service failed")
+		log.Err(err).Msg("creation of metrics service failed")
 		return
 	}
-	pingService, err := service.NewPingDBService(conn, zeroLogger)
+	pingService, err := service.NewPingDBService(conn, log)
 	if err != nil {
-		zeroLogger.Err(err).Msg("creation of ping db service failed")
+		log.Err(err).Msg("creation of ping db service failed")
 		return
 	}
 
-	handler := handlers.NewHandler(metricsService, pingService, zeroLogger)
+	handler := handlers.NewHandler(metricsService, pingService, log)
 	myServer := new(server.Server)
 	myServer.ServerRun(handler.Init(), cfg)
 }
