@@ -5,11 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/models"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/rs/zerolog"
-	"time"
 )
 
 const (
@@ -69,137 +70,47 @@ func NewConnectPostgres(cfg *config.ServerConfig, log *zerolog.Logger) (*DB, err
 }
 
 func (db *DB) Save(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
-	var err error
-
-	for attempt := 1; attempt <= db.maxAttempts; attempt++ {
-		err = nil
-		db.logger.Info().Str("func", "*DB.Save").Int("attempt", attempt).Any("metric", metric).Msg("trying to save metric")
-
-		// save metric to db
-		metric, err = db.saveMetric(ctx, metric, attempt)
-		retryable := db.checkIfRetryable(err)
-
-		// if not retryable
-		if !retryable {
-			// and error is not nil - abort
-			if err != nil {
-				db.logger.Err(err).Str("func", "*DB.Save").Msg("metric is NOT saved")
-				return models.Metrics{}, err
-			}
-			// and error is nil - success
-			db.logger.Info().Str("func", "*DB.Save").Int("attempt", attempt).Any("metric", metric).Msg("metric IS saved")
-			return metric, nil
-		}
-
-		// if error is retryable (non nil by default) - try again
-		time.Sleep(db.retryIntervals[attempt])
-		continue
-	}
-	// if retryable error persists and tries have ended - FAIL - return last occurred error
-	db.logger.Err(err).Str("func", "*DB.Save").Msg("metric is NOT saved")
-
-	return models.Metrics{}, err
+	var result models.Metrics
+	err := db.withRetry(ctx, "*DB.Save", func() error {
+		var saveErr error
+		result, saveErr = db.saveMetric(ctx, metric)
+		return saveErr
+	})
+	return result, err
 }
 
 func (db *DB) SaveAll(ctx context.Context, metrics []models.Metrics) error {
-	var err error
-
-	for attempt := 1; attempt <= db.maxAttempts; attempt++ {
-		db.logger.Info().Str("func", "*DB.SaveAll").Int("attempt", attempt).Msg("trying to save all metrics")
-		err = nil
-
-		// save all metrics to db
-		err = db.saveAll(ctx, metrics)
-		retryable := db.checkIfRetryable(err)
-
-		// if not retryable
-		if !retryable {
-			// and error is not nil - abort
-			if err != nil {
-				db.logger.Err(err).Str("func", "*DB.SaveAll").Int("attempt", attempt).Msg("metrics are NOT saved")
-				return err
-			}
-			// and error is nil - success
-			db.logger.Info().Str("func", "*DB.SaveAll").Int("attempt", attempt).Msg("all metrics are saved")
-			return nil
-		}
-
-		// if error is retryable (non nil by default) - try again
-		time.Sleep(db.retryIntervals[attempt])
-		continue
-	}
-	// if retryable error persists and tries have ended - FAIL - return last occurred error
-	db.logger.Err(err).Str("func", "*DB.SaveAll").Msg("metrics are NOT saved")
-
+	err := db.withRetry(ctx, "*DB.SaveAll", func() error {
+		var saveErr error
+		saveErr = db.saveAllMetrics(ctx, metrics)
+		return saveErr
+	})
 	return err
 }
 
 func (db *DB) Get(ctx context.Context, metric models.Metrics) (models.Metrics, bool) {
-	var err error
-	var found models.Metrics
-
-	for attempt := 1; attempt <= db.maxAttempts; attempt++ {
-		db.logger.Info().Str("func", "*DB.Get").Int("attempt", attempt).Msg("trying to find metric")
-		err = nil
-
-		// save all metrics to db
-		found, err = db.getMetric(ctx, metric)
-		retryable := db.checkIfRetryable(err)
-
-		// if not retryable
-		if !retryable {
-			// and error is not nil - abort
-			if err != nil {
-				db.logger.Err(err).Str("func", "*DB.Get").Int("attempt", attempt).Msg("metric is NOT found")
-				return models.Metrics{}, false
-			}
-			// and error is nil - success
-			db.logger.Info().Str("func", "*DB.Get").Int("attempt", attempt).Any("found metric", found).Msg("metric is found")
-			return found, true
-		}
-
-		// if error is retryable (non nil by default) - try again
-		time.Sleep(db.retryIntervals[attempt])
-		continue
+	var foundMetric models.Metrics
+	var found bool
+	err := db.withRetry(ctx, "*DB.Get", func() error {
+		var saveErr error
+		foundMetric, saveErr = db.getMetric(ctx, metric)
+		return saveErr
+	})
+	if err == nil {
+		found = true
 	}
-	// if retryable error persists and tries have ended - FAIL - return last occurred error
-	db.logger.Err(err).Str("func", "*DB.Get").Msg("metric is NOT found")
 
-	return models.Metrics{}, false
+	return foundMetric, found
 }
 
 func (db *DB) GetAll(ctx context.Context) ([]models.Metrics, error) {
-	var err error
-	var foundMetrics []models.Metrics
-
-	for attempt := 1; attempt <= db.maxAttempts; attempt++ {
-		db.logger.Info().Str("func", "*DB.GetAll").Int("attempt", attempt).Msg("trying to find metric")
-		err = nil
-
-		// save all metrics to db
-		foundMetrics, err = db.getAllMetrics(ctx)
-		retryable := db.checkIfRetryable(err)
-
-		// if not retryable
-		if !retryable {
-			// and error is not nil - abort
-			if err != nil {
-				db.logger.Err(err).Str("func", "*DB.GetAll").Int("attempt", attempt).Msg("metrics are NOT found")
-				return foundMetrics, nil
-			}
-			// and error is nil - success
-			db.logger.Info().Str("func", "*DB.GetAll").Int("attempt", attempt).Msg("metrics are found")
-			return foundMetrics, nil
-		}
-
-		// if error is retryable (non nil by default) - try again
-		time.Sleep(db.retryIntervals[attempt])
-		continue
-	}
-	// if retryable error persists and tries have ended - FAIL - return last occurred error
-	db.logger.Err(err).Str("func", "*DB.GetAll").Msg("metrics are NOT found")
-
-	return nil, err
+	var result []models.Metrics
+	err := db.withRetry(ctx, "*DB.GetAll", func() error {
+		var saveErr error
+		result, saveErr = db.getAllMetrics(ctx)
+		return saveErr
+	})
+	return result, err
 }
 
 func (db *DB) Migrate(ctx context.Context) error {
@@ -221,23 +132,41 @@ create table if not exists metrics
 	return nil
 }
 
-func (db *DB) saveMetric(ctx context.Context, metric models.Metrics, attempt int) (models.Metrics, error) {
+func (db *DB) withRetry(ctx context.Context, operation string, fn func() error) error {
+	var err error
+	for attempt := 1; attempt <= db.maxAttempts; attempt++ {
+		db.logger.Info().Str("func", operation).Int("attempt", attempt).Msg("trying operation")
+		err = fn()
+
+		if !db.checkIfRetryable(err) {
+			if err != nil {
+				db.logger.Err(err).Str("func", operation).Msg("operation failed")
+			}
+			return err
+		}
+
+		time.Sleep(db.retryIntervals[attempt])
+	}
+	return err
+}
+
+func (db *DB) saveMetric(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
 	if metric.MType == models.Gauge || metric.MType == models.Counter {
-		db.logger.Info().Str("func", "*DB.saveMetric").Int("attempt", attempt).Any("metric", metric).Msg("trying to save metric")
+		db.logger.Info().Str("func", "*DB.saveMetric").Any("metric", metric).Msg("trying to save metric")
 		// save metric in db
 		row := db.QueryRowContext(ctx, insertMetricsQuery, metric.ID, metric.MType, metric.Delta, metric.Value)
 		if err := row.Err(); err != nil {
-			db.logger.Error().Err(err).Int("attempt", attempt).Msg("error: row is nil")
+			db.logger.Error().Err(err).Msg("error: row is nil")
 			return models.Metrics{}, err
 		}
 
 		// scan saved metric from db
 		if err := row.Scan(&metric.ID, &metric.MType, &metric.Delta, &metric.Value); err != nil {
-			db.logger.Error().Err(err).Int("attempt", attempt).Msg("error: scanning error")
+			db.logger.Error().Err(err).Msg("error: scanning error")
 			return models.Metrics{}, err
 		}
 	} else {
-		db.logger.Error().Str("func", "*DB.saveMetric").Int("attempt", attempt).Any("metric", metric).Msg("unsupported metric type was passed")
+		db.logger.Error().Str("func", "*DB.saveMetric").Any("metric", metric).Msg("unsupported metric type was passed")
 		return models.Metrics{}, errors.New("unsupported metric type was passed")
 	}
 
@@ -245,7 +174,7 @@ func (db *DB) saveMetric(ctx context.Context, metric models.Metrics, attempt int
 	return metric, nil
 }
 
-func (db *DB) saveAll(ctx context.Context, metrics []models.Metrics) error {
+func (db *DB) saveAllMetrics(ctx context.Context, metrics []models.Metrics) error {
 	// begin transaction
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
