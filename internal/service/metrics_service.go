@@ -22,65 +22,80 @@ type CacheMetricsService struct {
 	log           *zerolog.Logger
 }
 
-func NewMetricsService(fileStorage *store.FileStorage, dbStorage *store.DB, cacheStorage *store.MemStorage, cfg *config.ServerConfig, log *zerolog.Logger) (MetricsSaverService, error) {
-	if cfg.DatabaseDSN != "" && dbStorage != nil {
-		return NewDatabaseMetricsService(dbStorage, log, cfg)
-	}
-	if cfg.FileStoragePath != "" && fileStorage != nil && cacheStorage != nil {
-		return NewCacheWithFileMetricsService(cacheStorage, fileStorage, log, cfg)
-	}
-	if cacheStorage != nil {
-		return NewCacheMetricsService(cacheStorage, log, cfg)
-	}
-
-	log.Error().Str("func", "service.NewMetricsService").Msg("error creating metrics service: nil storage was provided")
-	return nil, errors.New("error creating DatabaseMetricsService: nil db was provided")
+type MetricsServiceBuilder struct {
+	fileStorage  *store.FileStorage
+	dbStorage    *store.DB
+	cacheStorage *store.MemStorage
+	cfg          *config.ServerConfig
+	log          *zerolog.Logger
 }
 
-func NewDatabaseMetricsService(dbStorage *store.DB, log *zerolog.Logger, cfg *config.ServerConfig) (*DatabaseMetricsService, error) {
-	if dbStorage == nil {
-		log.Error().Msg("error during metrics service with DB creation: db storage connection is nil")
-		return nil, errors.New("error during metrics service with DB creation: db storage connection is nil")
-	}
-
-	log.Info().Str("func", "service.NewDatabaseMetricsService").Msg("metrics service with DB was created")
-	return &DatabaseMetricsService{
+func NewMetricsServiceBuilder(cfg *config.ServerConfig, log *zerolog.Logger) *MetricsServiceBuilder {
+	return &MetricsServiceBuilder{
+		cfg: cfg,
 		log: log,
-		db:  dbStorage,
-	}, nil
+	}
 }
 
-func NewCacheMetricsService(cache *store.MemStorage, log *zerolog.Logger, cfg *config.ServerConfig) (*CacheMetricsService, error) {
-	if cache == nil {
-		log.Error().Msg("error during metrics service with Cache creation: Cache storage is nil")
-		return nil, errors.New("error during metrics service with Cache creation: Cache storage is nil")
-	}
-
-	log.Info().Str("func", "service.NewCacheMetricsService").Msg("metrics service with only Cache was created")
-	return &CacheMetricsService{
-		cache: cache,
-		log:   log,
-	}, nil
+func (b *MetricsServiceBuilder) WithDB(db *store.DB) *MetricsServiceBuilder {
+	b.dbStorage = db
+	return b
 }
 
-func NewCacheWithFileMetricsService(cache *store.MemStorage, fileStorage *store.FileStorage, log *zerolog.Logger, cfg *config.ServerConfig) (*CacheMetricsService, error) {
-	if fileStorage == nil {
-		log.Error().Msg("error during metrics service with Cache creation: File storage is nil")
-		return nil, errors.New("error during  metrics service with DB creation: file storage is nil")
-	}
-	if cache == nil {
-		log.Error().Msg("error during metrics service with Cache creation: Cache storage is nil")
-		return nil, errors.New("error during  metrics service with DB creation: cache storage is nil")
+func (b *MetricsServiceBuilder) WithFile(file *store.FileStorage) *MetricsServiceBuilder {
+	b.fileStorage = file
+	return b
+}
+
+func (b *MetricsServiceBuilder) WithCache(cache *store.MemStorage) *MetricsServiceBuilder {
+	b.cacheStorage = cache
+	return b
+}
+
+func (b *MetricsServiceBuilder) Build() (MetricsSaverService, error) {
+	// DB - high priority
+	if b.cfg.DatabaseDSN != "" {
+		if b.dbStorage == nil {
+			b.log.Error().Msg("DB storage is nil")
+			return nil, errors.New("db storage is nil")
+		}
+		b.log.Info().Str("func", "MetricsServiceBuilder.Build").Msg("DatabaseMetricsService created")
+		return &DatabaseMetricsService{
+			db:  b.dbStorage,
+			log: b.log,
+		}, nil
 	}
 
-	log.Info().Str("func", "service.NewCacheMetricsService").Msg("metrics service with File and Cache was created")
-	// TODO add start of goroutine for saving metrics to file in later sprints
-	return &CacheMetricsService{
-		cache:         cache,
-		file:          fileStorage,
-		log:           log,
-		storeInterval: cfg.StoreInterval,
-	}, nil
+	// File + Cache
+	if b.cfg.FileStoragePath != "" {
+		if b.fileStorage == nil {
+			b.log.Error().Msg("File storage is nil")
+			return nil, errors.New("file storage is nil")
+		}
+		if b.cacheStorage == nil {
+			b.log.Error().Msg("Cache storage is nil")
+			return nil, errors.New("cache storage is nil")
+		}
+		b.log.Info().Str("func", "MetricsServiceBuilder.Build").Msg("CacheMetricsService with File created")
+		return &CacheMetricsService{
+			cache:         b.cacheStorage,
+			file:          b.fileStorage,
+			log:           b.log,
+			storeInterval: b.cfg.StoreInterval,
+		}, nil
+	}
+
+	// Cache only
+	if b.cacheStorage != nil {
+		b.log.Info().Str("func", "MetricsServiceBuilder.Build").Msg("CacheMetricsService created")
+		return &CacheMetricsService{
+			cache: b.cacheStorage,
+			log:   b.log,
+		}, nil
+	}
+
+	b.log.Error().Str("func", "MetricsServiceBuilder.Build").Msg("nil storage was provided")
+	return nil, errors.New("no valid storage provided")
 }
 
 func (m *DatabaseMetricsService) Save(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
