@@ -81,9 +81,9 @@ func (db *DB) Save(ctx context.Context, metric models.Metrics) (models.Metrics, 
 
 func (db *DB) SaveAll(ctx context.Context, metrics []models.Metrics) error {
 	err := db.withRetry(ctx, "*DB.SaveAll", func() error {
-		var saveErr error
-		saveErr = db.saveAllMetrics(ctx, metrics)
-		return saveErr
+		var saveAllErr error
+		saveAllErr = db.saveAllMetrics(ctx, metrics)
+		return saveAllErr
 	})
 	return err
 }
@@ -92,9 +92,9 @@ func (db *DB) Get(ctx context.Context, metric models.Metrics) (models.Metrics, b
 	var foundMetric models.Metrics
 	var found bool
 	err := db.withRetry(ctx, "*DB.Get", func() error {
-		var saveErr error
-		foundMetric, saveErr = db.getMetric(ctx, metric)
-		return saveErr
+		var getErr error
+		foundMetric, getErr = db.getMetric(ctx, metric)
+		return getErr
 	})
 	if err == nil {
 		found = true
@@ -106,9 +106,9 @@ func (db *DB) Get(ctx context.Context, metric models.Metrics) (models.Metrics, b
 func (db *DB) GetAll(ctx context.Context) ([]models.Metrics, error) {
 	var result []models.Metrics
 	err := db.withRetry(ctx, "*DB.GetAll", func() error {
-		var saveErr error
-		result, saveErr = db.getAllMetrics(ctx)
-		return saveErr
+		var getAllErr error
+		result, getAllErr = db.getAllMetrics(ctx)
+		return getAllErr
 	})
 	return result, err
 }
@@ -140,7 +140,7 @@ func (db *DB) withRetry(ctx context.Context, operation string, fn func() error) 
 
 		if !db.checkIfRetryable(err) {
 			if err != nil {
-				db.logger.Err(err).Str("func", operation).Msg("operation failed")
+				db.logger.Err(err).Str("func", operation).Int("attempt", attempt).Msg("operation failed")
 			}
 			return err
 		}
@@ -156,13 +156,13 @@ func (db *DB) saveMetric(ctx context.Context, metric models.Metrics) (models.Met
 		// save metric in db
 		row := db.QueryRowContext(ctx, insertMetricsQuery, metric.ID, metric.MType, metric.Delta, metric.Value)
 		if err := row.Err(); err != nil {
-			db.logger.Error().Err(err).Msg("error: row is nil")
+			db.logger.Error().Err(err).Str("func", "*DB.saveMetric").Msg("error: row is nil")
 			return models.Metrics{}, err
 		}
 
 		// scan saved metric from db
 		if err := row.Scan(&metric.ID, &metric.MType, &metric.Delta, &metric.Value); err != nil {
-			db.logger.Error().Err(err).Msg("error: scanning error")
+			db.logger.Error().Err(err).Str("func", "*DB.saveMetric").Msg("error: scanning error")
 			return models.Metrics{}, err
 		}
 	} else {
@@ -178,7 +178,7 @@ func (db *DB) saveAllMetrics(ctx context.Context, metrics []models.Metrics) erro
 	// begin transaction
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		db.logger.Err(err).Str("func", "*DB.SaveAll").Msg("error during opening transaction")
+		db.logger.Err(err).Str("func", "*DB.saveAllMetrics").Msg("error during opening transaction")
 		return fmt.Errorf("error during opening transaction: %w", err)
 	}
 	defer tx.Rollback()
@@ -186,7 +186,7 @@ func (db *DB) saveAllMetrics(ctx context.Context, metrics []models.Metrics) erro
 	// prepare context
 	stmt, err := tx.PrepareContext(ctx, insertMetricsQuery)
 	if err != nil {
-		db.logger.Err(err).Str("func", "*DB.SaveAll").Msg("error during preparing context")
+		db.logger.Err(err).Str("func", "*DB.saveAllMetrics").Msg("error during preparing context")
 		return err
 	}
 	defer stmt.Close()
@@ -197,20 +197,20 @@ func (db *DB) saveAllMetrics(ctx context.Context, metrics []models.Metrics) erro
 		var result sql.Result
 		var statementExecutionError error
 		if metric.MType == models.Gauge || metric.MType == models.Counter {
-			db.logger.Info().Str("func", "*DB.SaveAll").Any("metric", metric).Int("iteration", idx).Msg("trying to save metric")
+			db.logger.Info().Str("func", "*DB.saveAllMetrics").Any("metric", metric).Int("iteration", idx).Msg("trying to save metric")
 			result, statementExecutionError = stmt.ExecContext(ctx, metric.ID, metric.MType, metric.Delta, metric.Value)
 			if statementExecutionError != nil {
-				db.logger.Err(statementExecutionError).Str("func", "*DB.SaveAll").Any("metric", metric).Int("iteration", idx).Msg("error executing prepared UPSERT query for saving metric")
+				db.logger.Err(statementExecutionError).Str("func", "*DB.saveAllMetrics").Any("metric", metric).Int("iteration", idx).Msg("error executing prepared UPSERT query for saving metric")
 				return statementExecutionError
 			}
 		} else {
-			db.logger.Error().Str("func", "*DB.SaveAll").Any("metric", metric).Int("iteration", idx).Msg("unsupported metric type was passed")
+			db.logger.Error().Str("func", "*DB.saveAllMetrics").Any("metric", metric).Int("iteration", idx).Msg("unsupported metric type was passed")
 			return errors.New("unsupported metric type was passed")
 		}
 
 		rowsAffected, _ := result.RowsAffected()
 		if rowsAffected == 0 {
-			db.logger.Err(err).Str("func", "*DB.SaveAll").Msg("metric was not updated")
+			db.logger.Err(err).Str("func", "*DB.saveAllMetrics").Msg("metric was not updated")
 			return err
 		}
 	}
@@ -242,7 +242,7 @@ func (db *DB) getMetric(ctx context.Context, metric models.Metrics) (models.Metr
 func (db *DB) getAllMetrics(ctx context.Context) ([]models.Metrics, error) {
 	rows, err := db.QueryContext(ctx, getAllMetrics)
 	if err != nil {
-		db.logger.Err(err).Str("func", "*DB.GetAll").Msg("error during query execution")
+		db.logger.Err(err).Str("func", "*DB.getAllMetrics").Msg("error during query execution")
 		return nil, err
 	}
 
@@ -251,7 +251,7 @@ func (db *DB) getAllMetrics(ctx context.Context) ([]models.Metrics, error) {
 		var metric models.Metrics
 		err = rows.Scan(&metric.ID, &metric.MType, &metric.Delta, &metric.Value)
 		if err != nil {
-			db.logger.Err(err).Str("func", "*DB.GetAll").Msg("error during getting values from row")
+			db.logger.Err(err).Str("func", "*DB.getAllMetrics").Msg("error during getting values from row")
 			return nil, err
 		}
 
@@ -259,7 +259,7 @@ func (db *DB) getAllMetrics(ctx context.Context) ([]models.Metrics, error) {
 	}
 
 	if rowsErr := rows.Err(); rowsErr != nil {
-		db.logger.Err(rowsErr).Str("func", "*DB.GetAll").Msg("error during rows scanning")
+		db.logger.Err(rowsErr).Str("func", "*DB.getAllMetrics").Msg("error during rows scanning")
 		return nil, rowsErr
 	}
 
