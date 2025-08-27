@@ -2,22 +2,25 @@ package handlers
 
 import (
 	"github.com/MKhiriev/stunning-adventure/internal/service"
+	"github.com/MKhiriev/stunning-adventure/internal/validators"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/zerolog"
 )
 
 type Handler struct {
-	logger         *zerolog.Logger
-	metricsService service.MetricsSaverService
-	dbPingService  service.PingService
+	logger          *zerolog.Logger
+	metricsService  service.MetricsSaverService
+	dbPingService   service.PingService
+	metricValidator validators.Validator
 }
 
 func NewHandler(metricsService service.MetricsSaverService, dbPingService service.PingService, logger *zerolog.Logger) *Handler {
 	return &Handler{
-		logger:         logger,
-		metricsService: metricsService,
-		dbPingService:  dbPingService,
+		logger:          logger,
+		metricsService:  metricsService,
+		dbPingService:   dbPingService,
+		metricValidator: validators.NewMetricsValidator(),
 	}
 }
 
