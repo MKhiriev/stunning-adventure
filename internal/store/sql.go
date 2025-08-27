@@ -81,8 +81,7 @@ func (db *DB) Save(ctx context.Context, metric models.Metrics) (models.Metrics, 
 
 func (db *DB) SaveAll(ctx context.Context, metrics []models.Metrics) error {
 	err := db.withRetry(ctx, "*DB.SaveAll", func() error {
-		var saveAllErr error
-		saveAllErr = db.saveAllMetrics(ctx, metrics)
+		saveAllErr := db.saveAllMetrics(ctx, metrics)
 		return saveAllErr
 	})
 	return err

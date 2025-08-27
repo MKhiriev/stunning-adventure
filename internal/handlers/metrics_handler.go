@@ -100,7 +100,7 @@ func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 2. Check if metric from JSON is valid => if not - StatusBadRequest
-	if err := h.metricValidator.Validate(context.TODO(), metricFromBodyWithoutValue); err != nil {
+	if err := h.metricValidator.Validate(context.TODO(), metricFromBodyWithoutValue, validators.ID, validators.MType); err != nil {
 		h.logger.Err(err).Caller().Str("func", "*Handler.GetMetricJSON").Any("metric", metricFromBodyWithoutValue).Msg("passed metric is not valid")
 		http.Error(w, "passed metric is not valid", http.StatusBadRequest)
 		return
