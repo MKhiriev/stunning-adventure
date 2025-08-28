@@ -1,9 +1,10 @@
 package agent
 
 import (
-	"github.com/MKhiriev/stunning-adventure/models"
 	"maps"
 	"slices"
+
+	"github.com/MKhiriev/stunning-adventure/models"
 )
 
 type AgentStorage struct {

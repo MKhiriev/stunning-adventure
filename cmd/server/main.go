@@ -3,19 +3,47 @@ package main
 import (
 	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/internal/handlers"
+	"github.com/MKhiriev/stunning-adventure/internal/logger"
 	"github.com/MKhiriev/stunning-adventure/internal/server"
+	"github.com/MKhiriev/stunning-adventure/internal/service"
 	"github.com/MKhiriev/stunning-adventure/internal/store"
-	"github.com/MKhiriev/stunning-adventure/internal/utils"
 )
 
 func main() {
-	cfg := config.GetServerConfigs()
-	log := utils.NewLogger("metrics-server")
-	log.Info().Msg("Server started")
+	log := logger.NewLogger("metrics-server")
+	cfg, err := config.GetServerConfigs()
+	if err != nil {
+		log.Err(err).Msg("invalid server configuration was passed")
+		return
+	}
+	log.Info().Any("cfg-srv", cfg).Msg("Server started")
 
-	memStorage := store.NewMemStorage()
-	fileStorage := store.NewFileStorage(memStorage, cfg)
-	handler := handlers.NewHandler(memStorage, fileStorage, log)
+	memStorage := store.NewMemStorage(log)
+	conn, err := store.NewConnectPostgres(cfg, log)
+	if err != nil {
+		log.Err(err).Msg("connection to database failed")
+	}
+	fileStorage, err := store.NewFileStorage(memStorage, cfg, log)
+	if err != nil {
+		log.Err(err).Msg("file storage creation failed")
+	}
+
+	metricsService, err := service.NewMetricsServiceBuilder(cfg, log).
+		WithDB(conn).
+		WithFile(fileStorage).
+		WithCache(memStorage).
+		Build()
+	if err != nil {
+		log.Err(err).Msg("creation of metrics service failed")
+		return
+	}
+	pingService, err := service.NewPingDBService(conn, log)
+	if err != nil {
+		log.Err(err).Msg("creation of ping db service failed")
+		return
+	}
+
+	handler := handlers.NewHandler(metricsService, pingService, log)
 	myServer := new(server.Server)
 	myServer.ServerRun(handler.Init(), cfg)
 }

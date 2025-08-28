@@ -1,17 +1,19 @@
 package handlers
 
 import (
-	"github.com/MKhiriev/stunning-adventure/internal/config"
-	"github.com/MKhiriev/stunning-adventure/internal/store"
-	"github.com/MKhiriev/stunning-adventure/models"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
+
+	"github.com/MKhiriev/stunning-adventure/internal/config"
+	"github.com/MKhiriev/stunning-adventure/internal/service"
+	"github.com/MKhiriev/stunning-adventure/internal/store"
+	"github.com/MKhiriev/stunning-adventure/models"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMetricHandler(t *testing.T) {
@@ -132,15 +134,22 @@ func TestGetValueFromMetric(t *testing.T) {
 func initHandler() *Handler {
 	logger := zerolog.New(os.Stdout).With().Logger()
 	cfg := &config.ServerConfig{
-		ServerAddress:          "localhost:8080",
-		StoreInterval:          300,
-		FileStoragePath:        "tmp",
+		ServerAddress: "localhost:8080",
+		StoreInterval: 300,
+		//FileStoragePath:        "tmp",
 		RestoreMetricsFromFile: false,
 	}
-	memStorage := store.NewMemStorage()
-	fileStorage := store.NewFileStorage(memStorage, cfg)
+	memStorage := store.NewMemStorage(&logger)
+	fileStorage, _ := store.NewFileStorage(memStorage, cfg, &logger)
+	db := store.DB{}
+	metricsService, _ := service.NewMetricsServiceBuilder(cfg, &logger).
+		WithCache(memStorage).
+		WithFile(fileStorage).
+		WithDB(&db).
+		Build() //, &db, memStorage, cfg, &logger
+	dbPingService, _ := service.NewPingDBService(&db, &logger)
 
-	return NewHandler(memStorage, fileStorage, &logger)
+	return NewHandler(metricsService, dbPingService, &logger)
 }
 
 func mDelta(v int) *int64 {

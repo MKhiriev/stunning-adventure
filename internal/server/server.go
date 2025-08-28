@@ -1,8 +1,9 @@
 package server
 
 import (
-	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"net/http"
+
+	"github.com/MKhiriev/stunning-adventure/internal/config"
 )
 
 type Server struct {

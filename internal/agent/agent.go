@@ -6,11 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/MKhiriev/stunning-adventure/internal/config"
-	"github.com/MKhiriev/stunning-adventure/internal/utils"
-	"github.com/MKhiriev/stunning-adventure/models"
-	"github.com/go-resty/resty/v2"
-	"github.com/rs/zerolog"
 	"math/rand/v2"
 	"net/http"
 	"net/url"
@@ -18,6 +13,12 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/MKhiriev/stunning-adventure/internal/config"
+	"github.com/MKhiriev/stunning-adventure/internal/utils"
+	"github.com/MKhiriev/stunning-adventure/models"
+	"github.com/go-resty/resty/v2"
+	"github.com/rs/zerolog"
 )
 
 type MetricsAgent struct {
@@ -30,20 +31,34 @@ type MetricsAgent struct {
 	pollInterval   int64
 	mu             *sync.Mutex
 	logger         *zerolog.Logger
+	retryIntervals map[int]time.Duration
 }
 
 func NewMetricsAgent(route string, cfg *config.AgentConfig, logger *zerolog.Logger) *MetricsAgent {
-	return &MetricsAgent{
+	agent := &MetricsAgent{
 		serverAddress:  "http://" + cfg.ServerAddress,
 		route:          route,
-		client:         resty.New(),
+		client:         newHTTPClient(),
 		memory:         NewStorage(),
 		pollCount:      0,
 		reportInterval: cfg.ReportInterval,
 		pollInterval:   cfg.PollInterval,
 		logger:         logger,
 		mu:             &sync.Mutex{},
+		retryIntervals: map[int]time.Duration{
+			1: 1 * time.Second,
+			2: 3 * time.Second,
+			3: 5 * time.Second,
+		},
 	}
+
+	// add retry mechanism
+	agent.client.SetRetryCount(3).
+		SetRetryAfter(func(client *resty.Client, response *resty.Response) (time.Duration, error) {
+			return agent.retryIntervals[response.Request.Attempt], nil
+		}).SetRetryMaxWaitTime(5 * time.Second)
+
+	return agent
 }
 
 func (m *MetricsAgent) ReadMetrics() error {
@@ -57,6 +72,48 @@ func (m *MetricsAgent) ReadMetrics() error {
 	}
 
 	m.memory.RefreshAllMetrics(allMetrics...)
+	return nil
+}
+
+func (m *MetricsAgent) SendBatchMetricsJSON() error {
+	// get all metrics from memory
+	allMetrics := m.memory.GetAllMetrics()
+	if len(allMetrics) == 0 {
+		m.logger.Error().Caller().Str("func", "*MetricsAgent.SendBatchMetricsJSON").Msg("no metrics retrieved from memory")
+		return errors.New("no metrics passed")
+	}
+
+	route, pathJoinError := url.JoinPath(m.serverAddress, m.route, "/")
+	if pathJoinError != nil {
+		m.logger.Err(pathJoinError).Caller().Str("func", "*MetricsAgent.SendBatchMetricsJSON").Msg("url join error")
+		return fmt.Errorf("url join error: %w", pathJoinError)
+	}
+
+	// gzip encode metrics
+	compressedMetrics, compressionError := gzipCompressMultipleMetrics(allMetrics...)
+	if compressionError != nil {
+		m.logger.Err(compressionError).Caller().Str("func", "*MetricsAgent.SendBatchMetricsJSON").Msg("error occurred during gzip compression")
+		return compressionError
+	}
+
+	// send all metrics batched retrieved from memory
+	_, sendMetricError := m.client.R().
+		SetHeaders(map[string]string{
+			"Content-Type":     "application/json",
+			"Content-Encoding": "gzip",
+		}).
+		SetBody(compressedMetrics).
+		Post(route)
+	if sendMetricError != nil {
+		m.logger.Err(sendMetricError).Caller().Str("func", "*MetricsAgent.SendBatchMetricsJSON").Msg("error occurred during sending metric")
+		return fmt.Errorf("error occurred during sending metric: %w", sendMetricError)
+	}
+
+	m.logger.Info().Caller().Str("func", "*MetricsAgent.SendBatchMetricsJSON").Any("request body", compressedMetrics).Msg("request from agent")
+
+	// after sending metrics set poll count to 0
+	m.pollCount = 0
+
 	return nil
 }
 
@@ -83,7 +140,7 @@ func (m *MetricsAgent) SendMetricsJSON() error {
 			return compressionError
 		}
 
-		_, sendMetricError := resty.New().R().
+		_, sendMetricError := m.client.R().
 			SetHeaders(map[string]string{
 				"Content-Type":     "application/json",
 				"Content-Encoding": "gzip",
@@ -159,6 +216,10 @@ func (m *MetricsAgent) Run() error {
 	}
 
 	select {} // block main routine forever
+}
+
+func newHTTPClient() *resty.Client {
+	return resty.New().SetDebug(false)
 }
 
 func (m *MetricsAgent) getSliceOfMetrics(memStats runtime.MemStats) []models.Metrics {
@@ -243,6 +304,35 @@ func gzipCompress(metric models.Metrics) ([]byte, error) {
 	jsonData, err := json.Marshal(metric)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal metric: %w", err)
+	}
+
+	// создаем gzip-сжатие
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	if _, err := gz.Write(jsonData); err != nil {
+		return nil, fmt.Errorf("failed to gzip compress: %w", err)
+	}
+	if err := gz.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close gzip writer: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}
+
+func gzipCompressMultipleMetrics(metrics ...models.Metrics) ([]byte, error) {
+	var jsonData []byte
+	var err error
+	// сериализуем metrics в JSON
+	if len(metrics) == 1 {
+		jsonData, err = json.Marshal(metrics[0])
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal metric: %w", err)
+		}
+	} else {
+		jsonData, err = json.Marshal(metrics)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal metric: %w", err)
+		}
 	}
 
 	// создаем gzip-сжатие

@@ -13,8 +13,9 @@ const (
 	defaultReportInterval  = int64(5)
 	defaultServerAddress   = "localhost:8080"
 	defaultStoreInterval   = int64(300)
-	defaultFileStoragePath = "tmp"
-	defaultRestoreValue    = true
+	defaultFileStoragePath = ""
+	defaultRestoreValue    = false
+	defaultDatabaseDSN     = ""
 )
 
 type NetAddress struct {
@@ -22,7 +23,7 @@ type NetAddress struct {
 	Port int
 }
 
-func ParseServerFlags() (netAddress string, storeInterval int64, fileStoragePath string, restore bool) {
+func ParseServerFlags() (netAddress string, storeInterval int64, fileStoragePath string, restore bool, databaseDSN string) {
 	serverAddress := NetAddress{}
 	_ = flag.Value(&serverAddress)
 
@@ -30,10 +31,11 @@ func ParseServerFlags() (netAddress string, storeInterval int64, fileStoragePath
 	flag.Int64Var(&storeInterval, "i", defaultStoreInterval, "Store interval in seconds")
 	flag.StringVar(&fileStoragePath, "f", defaultFileStoragePath, "Storage file path string")
 	flag.BoolVar(&restore, "r", defaultRestoreValue, "Boolean - restore previous metrics from file")
+	flag.StringVar(&databaseDSN, "d", defaultDatabaseDSN, "Postgres database connection string")
 
 	flag.Parse()
 
-	return serverAddress.String(), storeInterval, fileStoragePath, restore
+	return serverAddress.String(), storeInterval, fileStoragePath, restore, databaseDSN
 }
 
 func ParseAgentFlags() (netAddress string, pollInterval int64, reportInterval int64) {

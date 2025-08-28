@@ -1,8 +1,10 @@
 package config
 
 import (
-	"github.com/caarlos0/env/v11"
+	"errors"
 	"log"
+
+	"github.com/caarlos0/env/v11"
 )
 
 type AgentConfig struct {
@@ -16,6 +18,7 @@ type ServerConfig struct {
 	StoreInterval          int64  `env:"STORE_INTERVAL"`
 	FileStoragePath        string `env:"FILE_STORAGE_PATH"`
 	RestoreMetricsFromFile bool   `env:"RESTORE"`
+	DatabaseDSN            string `env:"DATABASE_DSN"`
 }
 
 func GetAgentConfigs() *AgentConfig {
@@ -46,7 +49,7 @@ func GetAgentConfigs() *AgentConfig {
 	return cfg
 }
 
-func GetServerConfigs() *ServerConfig {
+func GetServerConfigs() (*ServerConfig, error) {
 	cfg := &ServerConfig{}
 	err := env.Parse(cfg)
 	if err != nil {
@@ -54,12 +57,12 @@ func GetServerConfigs() *ServerConfig {
 	}
 
 	// if all values are not nil return cfg
-	if cfg.ServerAddress != "" && cfg.StoreInterval != 0 && cfg.FileStoragePath != "" {
-		return cfg
+	if cfg.ServerAddress != "" && cfg.StoreInterval != 0 {
+		return cfg, cfg.Validate()
 	}
 
 	// else get command line args or default values
-	commandLineServerAddress, commandLineStoreInterval, commandLineFileStoragePath, commandLineRestore := ParseServerFlags()
+	commandLineServerAddress, commandLineStoreInterval, commandLineFileStoragePath, commandLineRestore, databaseDSN := ParseServerFlags()
 
 	if cfg.ServerAddress == "" {
 		cfg.ServerAddress = commandLineServerAddress
@@ -70,9 +73,23 @@ func GetServerConfigs() *ServerConfig {
 	if cfg.FileStoragePath == "" {
 		cfg.FileStoragePath = commandLineFileStoragePath
 	}
-	if !cfg.RestoreMetricsFromFile && !commandLineRestore {
+	if !cfg.RestoreMetricsFromFile {
 		cfg.RestoreMetricsFromFile = commandLineRestore
 	}
+	if cfg.DatabaseDSN == "" {
+		cfg.DatabaseDSN = databaseDSN
+	}
 
-	return cfg
+	return cfg, cfg.Validate()
+}
+
+func (s *ServerConfig) Validate() error {
+	switch {
+	case s.ServerAddress == "":
+		return errors.New("invalid Server Address")
+	case s.StoreInterval == 0:
+		return errors.New("invalid Store Interval")
+	}
+
+	return nil
 }

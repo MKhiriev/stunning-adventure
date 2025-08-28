@@ -1,29 +1,27 @@
 package store
 
 import (
+	"context"
 	"errors"
-	"github.com/MKhiriev/stunning-adventure/models"
 	"maps"
 	"slices"
 	"sync"
+
+	"github.com/MKhiriev/stunning-adventure/models"
+	"github.com/rs/zerolog"
 )
 
-type MetricsStorage interface {
-	AddCounter(models.Metrics) (models.Metrics, error)
-	UpdateGauge(models.Metrics) (models.Metrics, error)
-	GetMetricByNameAndType(metricName string, metricType string) (models.Metrics, bool)
-	GetAllMetrics() []models.Metrics
-}
 type MemStorage struct {
 	Memory map[string]models.Metrics `json:"metrics"`
 	mu     *sync.Mutex
+	log    *zerolog.Logger
 }
 
-func NewMemStorage() *MemStorage {
-	return &MemStorage{Memory: make(map[string]models.Metrics), mu: &sync.Mutex{}}
+func NewMemStorage(log *zerolog.Logger) *MemStorage {
+	return &MemStorage{Memory: make(map[string]models.Metrics), mu: &sync.Mutex{}, log: log}
 }
 
-func (m *MemStorage) AddCounter(metrics models.Metrics) (models.Metrics, error) {
+func (m *MemStorage) AddCounter(ctx context.Context, metrics models.Metrics) (models.Metrics, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -36,13 +34,6 @@ func (m *MemStorage) AddCounter(metrics models.Metrics) (models.Metrics, error) 
 	val, ok := m.Memory[metrics.ID]
 	// if metric name exists in storage - apply Counter logic
 	if ok {
-		// commented code was added because of increment's 1 rule:
-		// 		`- Тип `counter`, `int64` — новое значение должно добавляться к предыдущему,
-		//		если какое-то значение уже было известно серверу.`
-		//newDelta := *val.Delta + *metrics.Delta
-		//val.Delta = &newDelta
-
-		// add previous counter value with new value from agent
 		newDelta := *val.Delta + *metrics.Delta
 		val.Delta = &newDelta
 
@@ -57,7 +48,7 @@ func (m *MemStorage) AddCounter(metrics models.Metrics) (models.Metrics, error) 
 	return result, nil
 }
 
-func (m *MemStorage) UpdateGauge(metrics models.Metrics) (models.Metrics, error) {
+func (m *MemStorage) UpdateGauge(ctx context.Context, metrics models.Metrics) (models.Metrics, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -82,7 +73,7 @@ func (m *MemStorage) UpdateGauge(metrics models.Metrics) (models.Metrics, error)
 	return result, nil
 }
 
-func (m *MemStorage) GetMetricByNameAndType(metricName string, metricType string) (models.Metrics, bool) {
+func (m *MemStorage) GetMetricByNameAndType(ctx context.Context, metricName string, metricType string) (models.Metrics, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -97,9 +88,49 @@ func (m *MemStorage) GetMetricByNameAndType(metricName string, metricType string
 	return models.Metrics{}, false
 }
 
-func (m *MemStorage) GetAllMetrics() []models.Metrics {
+func (m *MemStorage) GetAllMetrics(ctx context.Context) []models.Metrics {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	return slices.Collect(maps.Values(m.Memory))
+}
+
+func (m *MemStorage) Save(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
+	switch metric.MType {
+	case models.Counter:
+		return m.AddCounter(ctx, metric)
+	case models.Gauge:
+		return m.UpdateGauge(ctx, metric)
+	default:
+		return metric, errors.New("unsupported metric type")
+	}
+}
+
+func (m *MemStorage) SaveAll(ctx context.Context, metrics []models.Metrics) error {
+	var err error
+	for _, metric := range metrics {
+		switch metric.MType {
+		case models.Counter:
+			_, err = m.AddCounter(ctx, metric)
+			if err != nil {
+				return err
+			}
+		case models.Gauge:
+			_, err = m.UpdateGauge(ctx, metric)
+			if err != nil {
+				return err
+			}
+		default:
+			return errors.New("unsupported metric type")
+		}
+	}
+	return nil
+}
+
+func (m *MemStorage) Get(ctx context.Context, metric models.Metrics) (models.Metrics, bool) {
+	return m.GetMetricByNameAndType(ctx, metric.ID, metric.MType)
+}
+
+func (m *MemStorage) GetAll(ctx context.Context) ([]models.Metrics, error) {
+	return m.GetAllMetrics(ctx), nil
 }
