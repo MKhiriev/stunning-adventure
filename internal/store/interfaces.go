@@ -9,7 +9,7 @@ import (
 type Storage interface {
 	Save(context.Context, models.Metrics) (models.Metrics, error) // for MetricsFileStorage we need to save multiple values - modify to accept multiple values
 	SaveAll(context.Context, []models.Metrics) error
-	Get(context.Context, models.Metrics) (models.Metrics, bool)
+	Get(context.Context, models.Metrics) (models.Metrics, error)
 	GetAll(context.Context) ([]models.Metrics, error)
 }
 

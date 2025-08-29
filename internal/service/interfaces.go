@@ -9,7 +9,7 @@ import (
 type MetricsSaverService interface {
 	Save(context.Context, models.Metrics) (models.Metrics, error)
 	SaveAll(context.Context, []models.Metrics) error
-	Get(context.Context, models.Metrics) (models.Metrics, bool)
+	Get(context.Context, models.Metrics) (models.Metrics, error)
 	GetAll(context.Context) ([]models.Metrics, error)
 }
 

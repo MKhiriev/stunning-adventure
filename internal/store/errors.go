@@ -7,6 +7,10 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+var (
+	ErrNotFound = errors.New("metric is not found")
+)
+
 const (
 	// NonRetryable - операцию не следует повторять
 	NonRetryable ErrorClassification = iota

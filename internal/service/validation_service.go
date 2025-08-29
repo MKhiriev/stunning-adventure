@@ -23,6 +23,7 @@ func NewValidatingMetricsService(log *zerolog.Logger) MetricsServiceWrapper {
 
 func (v *ValidatingMetricsService) Save(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
 	v.log.Info().Str("func", "*ValidatingMetricsService.Save").Any("metric", metric).Msg("validation before Save() started")
+	//TODO move validation here
 	if err := v.validator.Validate(ctx, metric); err != nil {
 		return models.Metrics{}, err
 	}
@@ -31,19 +32,26 @@ func (v *ValidatingMetricsService) Save(ctx context.Context, metric models.Metri
 
 func (v *ValidatingMetricsService) SaveAll(ctx context.Context, metrics []models.Metrics) error {
 	v.log.Info().Str("func", "*ValidatingMetricsService.SaveAll").Any("metrics", metrics).Msg("validation before SaveAll() started")
+	//TODO move validation here
 	if err := v.validator.Validate(ctx, metrics); err != nil {
 		return err
 	}
 	return v.inner.SaveAll(ctx, metrics)
 }
 
-func (v *ValidatingMetricsService) Get(ctx context.Context, metric models.Metrics) (models.Metrics, bool) {
+func (v *ValidatingMetricsService) Get(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
 	v.log.Info().Str("func", "*ValidatingMetricsService.Get").Any("metrics", metric).Msg("validation before Get() started")
+	err := v.validator.Validate(context.TODO(), metric, validators.ID, validators.MType)
+	if err != nil {
+		return models.Metrics{}, err
+	}
+
 	return v.inner.Get(ctx, metric)
 }
 
 func (v *ValidatingMetricsService) GetAll(ctx context.Context) ([]models.Metrics, error) {
 	v.log.Info().Str("func", "*ValidatingMetricsService.GetAll").Msg("no validation is needed")
+	//TODO move validation here
 	return v.inner.GetAll(ctx)
 }
 

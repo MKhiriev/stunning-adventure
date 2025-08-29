@@ -134,7 +134,7 @@ func (m *DatabaseMetricsService) SaveAll(ctx context.Context, metrics []models.M
 }
 
 // Get Возвращает метрику по имени и типу.// Получает данные из главного хранилища - Память или БД
-func (m *DatabaseMetricsService) Get(ctx context.Context, metric models.Metrics) (models.Metrics, bool) {
+func (m *DatabaseMetricsService) Get(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
 	return m.db.Get(ctx, metric)
 }
 
@@ -187,7 +187,7 @@ func (c *CacheMetricsService) SaveAll(ctx context.Context, metrics []models.Metr
 	return nil
 }
 
-func (c *CacheMetricsService) Get(ctx context.Context, metric models.Metrics) (models.Metrics, bool) {
+func (c *CacheMetricsService) Get(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
 	return c.cache.Get(ctx, metric)
 }
 

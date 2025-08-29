@@ -3,10 +3,12 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"html/template"
 	"net/http"
 	"strconv"
 
+	"github.com/MKhiriev/stunning-adventure/internal/store"
 	"github.com/MKhiriev/stunning-adventure/internal/validators"
 	"github.com/MKhiriev/stunning-adventure/models"
 	"github.com/go-chi/chi/v5"
@@ -90,29 +92,36 @@ func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	var metricFromBodyWithoutValue models.Metrics
+	var metric models.Metrics
 
-	// 1. Get JSON from the body
-	if err := json.NewDecoder(r.Body).Decode(&metricFromBodyWithoutValue); err != nil {
+	// 1. Get JSON from the body - handler level
+	if err := json.NewDecoder(r.Body).Decode(&metric); err != nil {
 		h.logger.Err(err).Caller().Str("func", "*Handler.GetMetricJSON").Msg("Invalid JSON was passed")
 		http.Error(w, "Invalid JSON was passed", http.StatusBadRequest)
 		return
 	}
 
-	// 2. Check if metric from JSON is valid => if not - StatusBadRequest
-	if err := h.metricValidator.Validate(context.TODO(), metricFromBodyWithoutValue, validators.ID, validators.MType); err != nil {
-		h.logger.Err(err).Caller().Str("func", "*Handler.GetMetricJSON").Any("metric", metricFromBodyWithoutValue).Msg("passed metric is not valid")
+	// 2. Check if metric from JSON has non-empty fields => if not - StatusBadRequest
+	if h.checkValue(metric.ID != "", validators.ErrEmptyID) != nil || h.checkValue(metric.MType != "", validators.ErrEmptyType) != nil {
+		h.logger.Error().Caller().Str("func", "*Handler.GetMetricJSON").Any("metric", metric).Msg("passed metric is not valid")
 		http.Error(w, "passed metric is not valid", http.StatusBadRequest)
 		return
 	}
 
 	// 3. Find metric in memory
-	foundMetric, ok := h.metricsService.Get(context.TODO(), metricFromBodyWithoutValue)
+	foundMetric, err := h.metricsService.Get(context.TODO(), metric)
 
-	if !ok {
-		h.logger.Info().Caller().Str("func", "*Handler.GetMetricJSON").Any("metric to find", metricFromBodyWithoutValue).Msg("metric not found")
-		w.WriteHeader(http.StatusNotFound)
-		return
+	if err != nil {
+		switch {
+		case errors.Is(err, validators.ErrInvalidType):
+			h.logger.Err(err).Caller().Str("func", "*Handler.GetMetricJSON").Any("metric to find", metric).Msg("metric type is not valid")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		case errors.Is(err, store.ErrNotFound):
+			h.logger.Err(err).Caller().Str("func", "*Handler.GetMetricJSON").Any("metric to find", metric).Msg("metric not found")
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
 	}
 
 	// 4. Marshal
@@ -170,37 +179,41 @@ func (h *Handler) MetricHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetMetricValue(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "text/plain")
-	metric := models.Metrics{
-		ID:    chi.URLParam(r, "metricName"),
-		MType: chi.URLParam(r, "metricType"),
-	}
+	id := chi.URLParam(r, "metricName")
+	mType := chi.URLParam(r, "metricType")
 
-	if err := h.metricValidator.Validate(context.TODO(), metric, validators.ID); err != nil {
+	// check if empty url params - handler
+	if err := h.checkValue(id != "", validators.ErrEmptyID); err != nil {
 		h.logger.Err(err).Caller().Str("func", "*Handler.GetMetricValue").Msg("metric name is not specified")
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-
-	if err := h.metricValidator.Validate(context.TODO(), metric, validators.MType); err != nil {
-		h.logger.Error().Caller().Str("func", "*Handler.GetMetricValue").Msg("metric type is not valid")
+	if err := h.checkValue(mType != "", validators.ErrEmptyType); err != nil {
+		h.logger.Error().Caller().Str("func", "*Handler.GetMetricValue").Msg("metric type is not specified")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	metric, isMetricFound := h.metricsService.Get(context.TODO(), metric)
+	// business logic + validation
+	metric, err := h.metricsService.Get(context.TODO(), models.Metrics{ID: id, MType: mType})
+
+	if err != nil {
+		switch {
+		case errors.Is(err, validators.ErrInvalidType):
+			h.logger.Err(err).Caller().Str("func", "*Handler.GetMetricValue").Msg("metric type is not valid")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		case errors.Is(err, store.ErrNotFound):
+			h.logger.Err(err).Caller().Str("func", "*Handler.GetMetricValue").Msg("metric not found")
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+	}
 
 	// if metric is present
-	if isMetricFound {
-		h.logger.Info().Caller().Str("func", "*Handler.GetMetricValue").Any("metric", metric).Msg("found metric")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(
-			h.getValueFromMetric(metric),
-		))
-	} else {
-		// if not present - return not found
-		h.logger.Error().Caller().Str("func", "*Handler.GetMetricValue").Msg("metric not found")
-		w.WriteHeader(http.StatusNotFound)
-	}
+	h.logger.Info().Caller().Str("func", "*Handler.GetMetricValue").Any("metric", metric).Msg("found metric")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(h.getValueFromMetric(metric)))
 }
 
 func (h *Handler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
@@ -247,4 +260,13 @@ func (h *Handler) getValueFromMetric(metric models.Metrics) string {
 		return strconv.FormatFloat(*metric.Value, 'f', -1, 64)
 	}
 	return ""
+}
+
+func (h *Handler) checkValue(cond bool, ifNotEmptyError error) error {
+	if !cond {
+		h.logger.Error().Str("func", "*Handler.checkValue").Msg("value is not valid")
+		return ifNotEmptyError
+	}
+
+	return nil
 }
