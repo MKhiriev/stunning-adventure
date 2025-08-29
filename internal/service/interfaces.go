@@ -16,3 +16,7 @@ type MetricsSaverService interface {
 type PingService interface {
 	Ping(ctx context.Context) error
 }
+
+type MetricsServiceWrapper interface {
+	Wrap(MetricsSaverService) MetricsSaverService
+}

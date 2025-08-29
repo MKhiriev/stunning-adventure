@@ -23,6 +23,7 @@ type CacheMetricsService struct {
 }
 
 type MetricsServiceBuilder struct {
+	wrappers     []MetricsServiceWrapper
 	fileStorage  *store.FileStorage
 	dbStorage    *store.DB
 	cacheStorage *store.MemStorage
@@ -52,14 +53,40 @@ func (b *MetricsServiceBuilder) WithCache(cache *store.MemStorage) *MetricsServi
 	return b
 }
 
+// WithWrapper add wrappers
+func (b *MetricsServiceBuilder) WithWrapper(wrapperService MetricsServiceWrapper) *MetricsServiceBuilder {
+	b.wrappers = append(b.wrappers, wrapperService)
+	return b
+}
+
 func (b *MetricsServiceBuilder) Build() (MetricsSaverService, error) {
+	var service MetricsSaverService
+
+	b.log.Info().Str("func", "MetricsServiceBuilder.Build").Msg("started building MetricsSaverService")
+	service, err := b.buildMetricsService()
+	if err != nil {
+		return nil, err
+	}
+
+	// adding wrappers if they exist
+	if len(b.wrappers) > 0 {
+		b.log.Info().Str("func", "MetricsServiceBuilder.Build").Msg("started adding wrapper services for the MetricsSaverService")
+		for _, wrapper := range b.wrappers {
+			service = wrapper.Wrap(service)
+		}
+	}
+
+	return service, nil
+}
+
+func (b *MetricsServiceBuilder) buildMetricsService() (MetricsSaverService, error) {
 	// DB - high priority
 	if b.cfg.DatabaseDSN != "" {
 		if b.dbStorage == nil {
 			b.log.Error().Msg("DB storage is nil")
 			return nil, errors.New("db storage is nil")
 		}
-		b.log.Info().Str("func", "MetricsServiceBuilder.Build").Msg("DatabaseMetricsService created")
+		b.log.Info().Str("func", "MetricsServiceBuilder.buildMetricsService").Msg("DatabaseMetricsService created")
 		return &DatabaseMetricsService{
 			db:  b.dbStorage,
 			log: b.log,
@@ -76,7 +103,7 @@ func (b *MetricsServiceBuilder) Build() (MetricsSaverService, error) {
 			b.log.Error().Msg("Cache storage is nil")
 			return nil, errors.New("cache storage is nil")
 		}
-		b.log.Info().Str("func", "MetricsServiceBuilder.Build").Msg("CacheMetricsService with File created")
+		b.log.Info().Str("func", "MetricsServiceBuilder.buildMetricsService").Msg("CacheMetricsService with File created")
 		return &CacheMetricsService{
 			cache:         b.cacheStorage,
 			file:          b.fileStorage,
@@ -87,14 +114,14 @@ func (b *MetricsServiceBuilder) Build() (MetricsSaverService, error) {
 
 	// Cache only
 	if b.cacheStorage != nil {
-		b.log.Info().Str("func", "MetricsServiceBuilder.Build").Msg("CacheMetricsService created")
+		b.log.Info().Str("func", "MetricsServiceBuilder.buildMetricsService").Msg("CacheMetricsService created")
 		return &CacheMetricsService{
 			cache: b.cacheStorage,
 			log:   b.log,
 		}, nil
 	}
 
-	b.log.Error().Str("func", "MetricsServiceBuilder.Build").Msg("nil storage was provided")
+	b.log.Error().Str("func", "MetricsServiceBuilder.buildMetricsService").Msg("nil storage was provided")
 	return nil, errors.New("no valid storage provided")
 }
 

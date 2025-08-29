@@ -28,10 +28,12 @@ func main() {
 		log.Err(err).Msg("file storage creation failed")
 	}
 
+	metricsValidationService := service.NewValidatingMetricsService(log)
 	metricsService, err := service.NewMetricsServiceBuilder(cfg, log).
 		WithDB(conn).
 		WithFile(fileStorage).
 		WithCache(memStorage).
+		WithWrapper(metricsValidationService).
 		Build()
 	if err != nil {
 		log.Err(err).Msg("creation of metrics service failed")
