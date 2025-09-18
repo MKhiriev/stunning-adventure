@@ -10,12 +10,12 @@ import (
 
 type Handler struct {
 	logger          *zerolog.Logger
-	metricsService  service.MetricsSaverService
+	metricsService  service.MetricsService
 	dbPingService   service.PingService
 	metricValidator validators.Validator
 }
 
-func NewHandler(metricsService service.MetricsSaverService, dbPingService service.PingService, logger *zerolog.Logger) *Handler {
+func NewHandler(metricsService service.MetricsService, dbPingService service.PingService, logger *zerolog.Logger) *Handler {
 	return &Handler{
 		logger:          logger,
 		metricsService:  metricsService,

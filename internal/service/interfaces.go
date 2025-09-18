@@ -6,7 +6,7 @@ import (
 	"github.com/MKhiriev/stunning-adventure/models"
 )
 
-type MetricsSaverService interface {
+type MetricsService interface {
 	Save(context.Context, models.Metrics) (models.Metrics, error)
 	SaveAll(context.Context, []models.Metrics) error
 	Get(context.Context, models.Metrics) (models.Metrics, error)
@@ -18,5 +18,5 @@ type PingService interface {
 }
 
 type MetricsServiceWrapper interface {
-	Wrap(MetricsSaverService) MetricsSaverService
+	Wrap(MetricsService) MetricsService
 }

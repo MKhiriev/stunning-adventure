@@ -26,20 +26,18 @@ func (h *Handler) BatchUpdateMetricJSON(w http.ResponseWriter, r *http.Request) 
 
 	h.logger.Info().Str("func", "*Handler.BatchUpdateMetricJSON").Interface("metric from body", metricsFromBody).Msg("BatchUpdateMetricJSON was called!")
 
-	for _, metric := range metricsFromBody {
-		// Check if metric from JSON is valid => if not - StatusBadRequest
-		if err := h.metricValidator.Validate(context.TODO(), metric); err != nil {
-			h.logger.Err(err).Caller().Str("func", "*Handler.BatchUpdateMetricJSON").Any("metric", metric).Msg("passed metric is not valid")
+	// update all values + validation
+	if err := h.metricsService.SaveAll(context.TODO(), metricsFromBody); err != nil {
+		switch {
+		case errors.Is(err, validators.ErrEmptyID) || errors.Is(err, validators.ErrEmptyType) || errors.Is(err, validators.ErrNoValue) || errors.Is(err, validators.ErrInvalidType):
+			h.logger.Err(err).Caller().Str("func", "*Handler.BatchUpdateMetricJSON").Msg("passed metric is not valid")
 			http.Error(w, "passed metric is not valid", http.StatusBadRequest)
 			return
+		default:
+			h.logger.Err(err).Caller().Str("func", "*Handler.BatchUpdateMetricJSON").Msg("error occurred during metric update")
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
 		}
-	}
-
-	// update all values
-	if err := h.metricsService.SaveAll(context.TODO(), metricsFromBody); err != nil {
-		h.logger.Err(err).Caller().Str("func", "*Handler.BatchUpdateMetricJSON").Msg("error occurred during metric update")
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
 	}
 
 	// 4. Set Content type to `application/json`
@@ -59,20 +57,19 @@ func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 
 	h.logger.Info().Str("func", "*Handler.UpdateMetricJSON").Interface("metric from body", metricFromBody).Msg("UpdateMetricJSON was called!")
 
-	// 2. Check if metric from JSON is valid => if not - StatusBadRequest
-	if err := h.metricValidator.Validate(context.TODO(), metricFromBody); err != nil {
-		h.logger.Error().Caller().Str("func", "*Handler.UpdateMetricJSON").Any("metric", metricFromBody).Msg("passed metric is not valid")
-		http.Error(w, "passed metric is not valid", http.StatusBadRequest)
-		return
-	}
-
 	var err error
-	// 3. Update metric's value based on it's type
-	metricFromBody, err = h.metricsService.Save(context.TODO(), metricFromBody)
-	if err != nil {
-		h.logger.Err(err).Caller().Str("func", "*Handler.UpdateMetricJSON").Msg("error occurred during metric update")
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
+	// 3. Update metric's value based on it's type + validation
+	if metricFromBody, err = h.metricsService.Save(context.TODO(), metricFromBody); err != nil {
+		switch {
+		case errors.Is(err, validators.ErrEmptyID) || errors.Is(err, validators.ErrEmptyType) || errors.Is(err, validators.ErrNoValue) || errors.Is(err, validators.ErrInvalidType):
+			h.logger.Err(err).Caller().Str("func", "*Handler.UpdateMetricJSON").Any("metric", metricFromBody).Msg("passed metric is not valid")
+			http.Error(w, "passed metric is not valid", http.StatusBadRequest)
+			return
+		default:
+			h.logger.Err(err).Caller().Str("func", "*Handler.UpdateMetricJSON").Msg("error occurred during metric update")
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// 4. Set Content type to `application/json`
@@ -101,25 +98,17 @@ func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2. Check if metric from JSON has non-empty fields => if not - StatusBadRequest
-	if h.checkValue(metric.ID != "", validators.ErrEmptyID) != nil || h.checkValue(metric.MType != "", validators.ErrEmptyType) != nil {
-		h.logger.Error().Caller().Str("func", "*Handler.GetMetricJSON").Any("metric", metric).Msg("passed metric is not valid")
-		http.Error(w, "passed metric is not valid", http.StatusBadRequest)
-		return
-	}
-
 	// 3. Find metric in memory
 	foundMetric, err := h.metricsService.Get(context.TODO(), metric)
-
 	if err != nil {
 		switch {
-		case errors.Is(err, validators.ErrInvalidType):
-			h.logger.Err(err).Caller().Str("func", "*Handler.GetMetricJSON").Any("metric to find", metric).Msg("metric type is not valid")
-			w.WriteHeader(http.StatusBadRequest)
-			return
 		case errors.Is(err, store.ErrNotFound):
 			h.logger.Err(err).Caller().Str("func", "*Handler.GetMetricJSON").Any("metric to find", metric).Msg("metric not found")
-			w.WriteHeader(http.StatusNotFound)
+			http.Error(w, "metric not found", http.StatusBadRequest)
+			return
+		case errors.Is(err, validators.ErrEmptyID) || errors.Is(err, validators.ErrEmptyType) || errors.Is(err, validators.ErrInvalidType):
+			h.logger.Err(err).Caller().Str("func", "*Handler.GetMetricJSON").Any("metric to find", metric).Msg("metric type is not valid")
+			http.Error(w, "passed metric is not valid", http.StatusBadRequest)
 			return
 		}
 	}
@@ -146,20 +135,22 @@ func (h *Handler) MetricHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	metricValue := chi.URLParam(r, "metricValue")
 
-	// if metric name is not specified - iter1
-	if err := h.metricValidator.Validate(context.TODO(), metric, validators.ID); err != nil {
-		h.logger.Err(err).Caller().Str("func", "*Handler.MetricHandler").Msg("metric name is not specified")
-		w.WriteHeader(http.StatusNotFound)
-		return
+	// check passed metric name and type
+	if err := h.metricValidator.Validate(context.TODO(), metric, validators.ID, validators.MType); err != nil {
+		switch {
+		case errors.Is(err, validators.ErrEmptyID):
+			h.logger.Err(err).Caller().Str("func", "*Handler.MetricHandler").Msg("metric name (id) is empty or not found")
+			w.WriteHeader(http.StatusNotFound)
+			return
+
+		case errors.Is(err, validators.ErrInvalidType) || errors.Is(err, validators.ErrEmptyType):
+			h.logger.Err(err).Caller().Str("func", "*Handler.MetricHandler").Msg("metric type is not valid or empty")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 	}
 
-	// if metric type is not valid => http.StatusBadRequest
-	if err := h.metricValidator.Validate(context.TODO(), metric, validators.MType); err != nil {
-		h.logger.Err(err).Caller().Str("func", "*Handler.MetricHandler").Msg("metric type is not valid")
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
+	// create new metric + validate validate metric value
 	metric, err := models.NewMetric(metric.ID, metric.MType, metricValue)
 	if err != nil {
 		h.logger.Err(err).Caller().Str("func", "*Handler.MetricHandler").Msg("error during metric creation")
@@ -182,30 +173,18 @@ func (h *Handler) GetMetricValue(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "metricName")
 	mType := chi.URLParam(r, "metricType")
 
-	// check if empty url params - handler
-	if err := h.checkValue(id != "", validators.ErrEmptyID); err != nil {
-		h.logger.Err(err).Caller().Str("func", "*Handler.GetMetricValue").Msg("metric name is not specified")
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	if err := h.checkValue(mType != "", validators.ErrEmptyType); err != nil {
-		h.logger.Error().Caller().Str("func", "*Handler.GetMetricValue").Msg("metric type is not specified")
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
 	// business logic + validation
 	metric, err := h.metricsService.Get(context.TODO(), models.Metrics{ID: id, MType: mType})
 
 	if err != nil {
 		switch {
-		case errors.Is(err, validators.ErrInvalidType):
-			h.logger.Err(err).Caller().Str("func", "*Handler.GetMetricValue").Msg("metric type is not valid")
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		case errors.Is(err, store.ErrNotFound):
-			h.logger.Err(err).Caller().Str("func", "*Handler.GetMetricValue").Msg("metric not found")
+		case errors.Is(err, store.ErrNotFound) || errors.Is(err, validators.ErrEmptyID):
+			h.logger.Err(err).Caller().Str("func", "*Handler.GetMetricValue").Msg("metric name (id) is empty or not found")
 			w.WriteHeader(http.StatusNotFound)
+			return
+		case errors.Is(err, validators.ErrInvalidType) || errors.Is(err, validators.ErrEmptyType):
+			h.logger.Err(err).Caller().Str("func", "*Handler.GetMetricValue").Msg("metric type is not valid or empty")
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 	}
@@ -230,6 +209,7 @@ func (h *Handler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
+	// TODO hide all HTML creation logic under new service
 	type HTMLMetric struct {
 		ID    string
 		MType string

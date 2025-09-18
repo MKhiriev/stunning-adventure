@@ -59,10 +59,10 @@ func (b *MetricsServiceBuilder) WithWrapper(wrapperService MetricsServiceWrapper
 	return b
 }
 
-func (b *MetricsServiceBuilder) Build() (MetricsSaverService, error) {
-	var service MetricsSaverService
+func (b *MetricsServiceBuilder) Build() (MetricsService, error) {
+	var service MetricsService
 
-	b.log.Info().Str("func", "MetricsServiceBuilder.Build").Msg("started building MetricsSaverService")
+	b.log.Info().Str("func", "MetricsServiceBuilder.Build").Msg("started building MetricsService")
 	service, err := b.buildMetricsService()
 	if err != nil {
 		return nil, err
@@ -70,7 +70,7 @@ func (b *MetricsServiceBuilder) Build() (MetricsSaverService, error) {
 
 	// adding wrappers if they exist
 	if len(b.wrappers) > 0 {
-		b.log.Info().Str("func", "MetricsServiceBuilder.Build").Msg("started adding wrapper services for the MetricsSaverService")
+		b.log.Info().Str("func", "MetricsServiceBuilder.Build").Msg("started adding wrapper services for the MetricsService")
 		for _, wrapper := range b.wrappers {
 			service = wrapper.Wrap(service)
 		}
@@ -79,7 +79,7 @@ func (b *MetricsServiceBuilder) Build() (MetricsSaverService, error) {
 	return service, nil
 }
 
-func (b *MetricsServiceBuilder) buildMetricsService() (MetricsSaverService, error) {
+func (b *MetricsServiceBuilder) buildMetricsService() (MetricsService, error) {
 	// DB - high priority
 	if b.cfg.DatabaseDSN != "" {
 		if b.dbStorage == nil {
