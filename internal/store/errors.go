@@ -7,6 +7,12 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+// ErrorClassification тип для классификации ошибок
+type ErrorClassification int
+
+// PostgresErrorClassifier классификатор ошибок PostgreSQL
+type PostgresErrorClassifier struct{}
+
 var (
 	ErrNotFound = errors.New("metric is not found")
 )
@@ -18,9 +24,6 @@ const (
 	// Retryable - операцию можно повторить
 	Retryable
 )
-
-// PostgresErrorClassifier классификатор ошибок PostgreSQL
-type PostgresErrorClassifier struct{}
 
 func NewPostgresErrorClassifier() *PostgresErrorClassifier {
 	return &PostgresErrorClassifier{}

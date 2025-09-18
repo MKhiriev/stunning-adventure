@@ -7,7 +7,7 @@ import (
 )
 
 type Storage interface {
-	Save(context.Context, models.Metrics) (models.Metrics, error) // for MetricsFileStorage we need to save multiple values - modify to accept multiple values
+	Save(context.Context, models.Metrics) (models.Metrics, error)
 	SaveAll(context.Context, []models.Metrics) error
 	Get(context.Context, models.Metrics) (models.Metrics, error)
 	GetAll(context.Context) ([]models.Metrics, error)
@@ -28,9 +28,6 @@ type MetricsCacheStorage interface {
 type MetricsDatabaseStorage interface {
 	Migrate(context.Context) error
 }
-
-// ErrorClassification тип для классификации ошибок
-type ErrorClassification int
 
 type ErrorClassificator interface {
 	Classify(err error) ErrorClassification

@@ -1,26 +1,12 @@
 package service
 
 import (
-	"context"
 	"errors"
 
 	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/internal/store"
-	"github.com/MKhiriev/stunning-adventure/models"
 	"github.com/rs/zerolog"
 )
-
-type DatabaseMetricsService struct {
-	db  store.Storage // primary chosen store.Storage provider - db
-	log *zerolog.Logger
-}
-
-type CacheMetricsService struct {
-	file          store.Storage // secondary chosen store.Storage provider - file
-	cache         store.Storage // primary chosen store.Storage provider - cache
-	storeInterval int64         // for file-storage. Only needed if file storage is provided
-	log           *zerolog.Logger
-}
 
 type MetricsServiceBuilder struct {
 	wrappers     []MetricsServiceWrapper
@@ -123,74 +109,4 @@ func (b *MetricsServiceBuilder) buildMetricsService() (MetricsService, error) {
 
 	b.log.Error().Str("func", "MetricsServiceBuilder.buildMetricsService").Msg("nil storage was provided")
 	return nil, errors.New("no valid storage provided")
-}
-
-func (m *DatabaseMetricsService) Save(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
-	return m.db.Save(ctx, metric)
-}
-
-func (m *DatabaseMetricsService) SaveAll(ctx context.Context, metrics []models.Metrics) error {
-	return m.db.SaveAll(ctx, metrics)
-}
-
-// Get Возвращает метрику по имени и типу.// Получает данные из главного хранилища - Память или БД
-func (m *DatabaseMetricsService) Get(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
-	return m.db.Get(ctx, metric)
-}
-
-// GetAll Возвращает все записанные в главное хранилище метрики.// Получает данные из главного хранилища - Память или БД
-func (m *DatabaseMetricsService) GetAll(ctx context.Context) ([]models.Metrics, error) {
-	return m.db.GetAll(ctx)
-}
-
-func (c *CacheMetricsService) Save(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
-	// save metric in cache memory
-	result, err := c.cache.Save(ctx, metric)
-	if err != nil {
-		return models.Metrics{}, err
-	}
-
-	// if file storage was provided
-	if c.file != nil {
-		// get all metrics from Cache storage
-		allMetrics, err := c.cache.GetAll(ctx)
-		if err != nil {
-			return models.Metrics{}, err
-		}
-
-		// save all metrics to file
-		err = c.file.SaveAll(ctx, allMetrics)
-		if err != nil {
-			return models.Metrics{}, err
-		}
-	}
-
-	return result, nil
-}
-
-func (c *CacheMetricsService) SaveAll(ctx context.Context, metrics []models.Metrics) error {
-	// save all metrics in cache memory
-	err := c.cache.SaveAll(ctx, metrics)
-	if err != nil {
-		return err
-	}
-
-	// if file storage was provided
-	if c.file != nil {
-		// save all provided metrics
-		err = c.file.SaveAll(ctx, metrics)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (c *CacheMetricsService) Get(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
-	return c.cache.Get(ctx, metric)
-}
-
-func (c *CacheMetricsService) GetAll(ctx context.Context) ([]models.Metrics, error) {
-	return c.cache.GetAll(ctx)
 }
