@@ -104,7 +104,7 @@ func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, store.ErrNotFound):
 			h.logger.Err(err).Caller().Str("func", "*Handler.GetMetricJSON").Any("metric to find", metric).Msg("metric not found")
-			http.Error(w, "metric not found", http.StatusBadRequest)
+			http.Error(w, "metric not found", http.StatusNotFound)
 			return
 		case errors.Is(err, validators.ErrEmptyID) || errors.Is(err, validators.ErrEmptyType) || errors.Is(err, validators.ErrInvalidType):
 			h.logger.Err(err).Caller().Str("func", "*Handler.GetMetricJSON").Any("metric to find", metric).Msg("metric type is not valid")
