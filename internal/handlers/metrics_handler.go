@@ -24,7 +24,7 @@ func (h *Handler) BatchUpdateMetricJSON(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	h.logger.Info().Str("func", "*Handler.BatchUpdateMetricJSON").Interface("metric from body", metricsFromBody).Msg("BatchUpdateMetricJSON was called!")
+	h.logger.Info().Str("func", "*Handler.BatchUpdateMetricJSON").Interface("metrics from body", metricsFromBody).Msg("BatchUpdateMetricJSON was called!")
 
 	// update all values + validation
 	if err := h.metricsService.SaveAll(context.TODO(), metricsFromBody); err != nil {
@@ -196,6 +196,7 @@ func (h *Handler) GetMetricValue(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
+	// TODO hide all HTML creation logic under new service
 	html, err := template.ParseFiles("web/template/all-metrics.html", "web/template/metrics-list.html")
 	if err != nil || html == nil {
 		h.logger.Err(err).Caller().Str("func", "*Handler.GetAllMetrics").Msg("error during parsing html templates")
@@ -209,7 +210,7 @@ func (h *Handler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	// TODO hide all HTML creation logic under new service
+
 	type HTMLMetric struct {
 		ID    string
 		MType string
