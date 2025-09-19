@@ -11,6 +11,7 @@ type AgentConfig struct {
 	ServerAddress  string `env:"ADDRESS"`
 	ReportInterval int64  `env:"REPORT_INTERVAL"`
 	PollInterval   int64  `env:"POLL_INTERVAL"`
+	HashKey        string `env:"KEY"`
 }
 
 type ServerConfig struct {
@@ -19,6 +20,7 @@ type ServerConfig struct {
 	FileStoragePath        string `env:"FILE_STORAGE_PATH"`
 	RestoreMetricsFromFile bool   `env:"RESTORE"`
 	DatabaseDSN            string `env:"DATABASE_DSN"`
+	HashKey                string `env:"KEY"`
 }
 
 func GetAgentConfigs() *AgentConfig {
@@ -34,7 +36,7 @@ func GetAgentConfigs() *AgentConfig {
 	}
 
 	// else get command line args or default values
-	commandLineServerAddress, commandLinePollInterval, commandLineReportInterval := ParseAgentFlags()
+	commandLineServerAddress, commandLinePollInterval, commandLineReportInterval, commandLineHashKey := ParseAgentFlags()
 
 	if cfg.ServerAddress == "" {
 		cfg.ServerAddress = commandLineServerAddress
@@ -44,6 +46,9 @@ func GetAgentConfigs() *AgentConfig {
 	}
 	if cfg.ReportInterval == 0 {
 		cfg.ReportInterval = commandLineReportInterval
+	}
+	if cfg.HashKey == "" {
+		cfg.HashKey = commandLineHashKey
 	}
 
 	return cfg
@@ -62,7 +67,7 @@ func GetServerConfigs() (*ServerConfig, error) {
 	}
 
 	// else get command line args or default values
-	commandLineServerAddress, commandLineStoreInterval, commandLineFileStoragePath, commandLineRestore, databaseDSN := ParseServerFlags()
+	commandLineServerAddress, commandLineStoreInterval, commandLineFileStoragePath, commandLineRestore, databaseDSN, commandLineHashKey := ParseServerFlags()
 
 	if cfg.ServerAddress == "" {
 		cfg.ServerAddress = commandLineServerAddress
@@ -78,6 +83,9 @@ func GetServerConfigs() (*ServerConfig, error) {
 	}
 	if cfg.DatabaseDSN == "" {
 		cfg.DatabaseDSN = databaseDSN
+	}
+	if cfg.HashKey == "" {
+		cfg.HashKey = commandLineHashKey
 	}
 
 	return cfg, cfg.Validate()
