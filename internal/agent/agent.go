@@ -3,9 +3,12 @@ package agent
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash"
 	"math/rand/v2"
 	"net/http"
 	"net/url"
@@ -32,6 +35,7 @@ type MetricsAgent struct {
 	mu             *sync.Mutex
 	logger         *zerolog.Logger
 	retryIntervals map[int]time.Duration
+	hasher         *Hasher
 }
 
 func NewMetricsAgent(route string, cfg *config.AgentConfig, logger *zerolog.Logger) *MetricsAgent {
@@ -50,6 +54,7 @@ func NewMetricsAgent(route string, cfg *config.AgentConfig, logger *zerolog.Logg
 			2: 3 * time.Second,
 			3: 5 * time.Second,
 		},
+		hasher: NewHasher(cfg.HashKey),
 	}
 
 	// add retry mechanism
@@ -129,9 +134,24 @@ func (m *MetricsAgent) SendMetricsJSON() error {
 		m.logger.Err(pathJoinError).Caller().Str("func", "*MetricsAgent.SendMetricsJSON").Msg("url join error")
 		return fmt.Errorf("url join error: %w", pathJoinError)
 	}
+
+	headers := map[string]string{
+		"Content-Type":     "application/json",
+		"Content-Encoding": "gzip",
+	}
+
 	// send every metric retrieved from memory
 	for _, metric := range allMetrics {
 		var response models.Metrics
+
+		if m.hasher != nil {
+			hashedMetric, hashingError := m.hasher.HashMetric(metric)
+			if hashingError != nil {
+				m.logger.Err(hashingError).Caller().Str("func", "*MetricsAgent.SendMetricsJSON").Msg("error occurred during hashing metric")
+				return hashingError
+			}
+			headers["HashSHA256"] = string(hashedMetric)
+		}
 
 		// gzip encode metric
 		compressedMetric, compressionError := gzipCompress(metric)
@@ -141,10 +161,7 @@ func (m *MetricsAgent) SendMetricsJSON() error {
 		}
 
 		_, sendMetricError := m.client.R().
-			SetHeaders(map[string]string{
-				"Content-Type":     "application/json",
-				"Content-Encoding": "gzip",
-			}).
+			SetHeaders(headers).
 			SetBody(compressedMetric).
 			SetResult(&response).
 			Post(route)
@@ -346,4 +363,34 @@ func gzipCompressMultipleMetrics(metrics ...models.Metrics) ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
+}
+
+type Hasher struct {
+	hash.Hash
+}
+
+func NewHasher(hashKey string) *Hasher {
+	if hashKey != "" {
+		return &Hasher{
+			Hash: hmac.New(sha256.New, []byte(hashKey)),
+		}
+	}
+
+	return nil
+}
+
+func (h *Hasher) HashMetric(metric models.Metrics) ([]byte, error) {
+	metricJSON, err := json.Marshal(metric)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = h.Write(metricJSON)
+	if err != nil {
+		return nil, err
+	}
+
+	hashedMetric := h.Sum(nil)
+
+	return hashedMetric, nil
 }
