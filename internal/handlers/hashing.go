@@ -10,7 +10,7 @@ import (
 func (h *Handler) WithHashing(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		// if we don't have hashkey to check hash or do not have an http-body - do nothing
-		if h.hasher == nil {
+		if h.hasher == nil || req.Body == nil {
 			next.ServeHTTP(w, req)
 			return
 		}
