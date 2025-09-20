@@ -152,7 +152,7 @@ func initHandler() *Handler {
 		Build() //, &db, memStorage, cfg, &logger
 	dbPingService, _ := service.NewPingDBService(&db, &logger)
 
-	return NewHandler(metricsService, dbPingService, &logger)
+	return NewHandler(metricsService, dbPingService, cfg, &logger)
 }
 
 func mDelta(v int) *int64 {
