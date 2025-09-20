@@ -2,7 +2,6 @@ package validators
 
 import (
 	"context"
-	"errors"
 	"slices"
 
 	"github.com/MKhiriev/stunning-adventure/models"
@@ -31,7 +30,7 @@ func (v *MetricsValidator) Validate(ctx context.Context, obj any, fields ...stri
 		// check if it's a pointer
 		ptr, ok := obj.(*models.Metrics)
 		if !ok {
-			return errors.New("unsupported type for validation")
+			return ErrUnsupportedType
 		}
 		metric = *ptr
 	}
@@ -45,21 +44,21 @@ func (v *MetricsValidator) Validate(ctx context.Context, obj any, fields ...stri
 		switch f {
 		case "id":
 			if metric.ID == "" {
-				return errors.New("metric id is empty")
+				return ErrEmptyID
 			}
 		case "type":
 			if metric.MType == "" {
-				return errors.New("metric type is empty")
+				return ErrEmptyType
 			}
 			if !slices.Contains(v.allowedMetricTypes, metric.MType) {
-				return errors.New("metric type is not valid")
+				return ErrInvalidType
 			}
 		case "value":
 			if metric.Value == nil && metric.Delta == nil {
-				return errors.New("metric has no value")
+				return ErrNoValue
 			}
 		default:
-			return errors.New("unknown field for validation: " + f)
+			return ErrUnknownField
 		}
 	}
 	return nil

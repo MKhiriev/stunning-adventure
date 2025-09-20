@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/internal/service"
+	"github.com/MKhiriev/stunning-adventure/internal/utils"
 	"github.com/MKhiriev/stunning-adventure/internal/validators"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -10,23 +12,25 @@ import (
 
 type Handler struct {
 	logger          *zerolog.Logger
-	metricsService  service.MetricsSaverService
+	metricsService  service.MetricsService
 	dbPingService   service.PingService
 	metricValidator validators.Validator
+	hasher          *utils.Hasher
 }
 
-func NewHandler(metricsService service.MetricsSaverService, dbPingService service.PingService, logger *zerolog.Logger) *Handler {
+func NewHandler(metricsService service.MetricsService, dbPingService service.PingService, cfg *config.ServerConfig, logger *zerolog.Logger) *Handler {
 	return &Handler{
 		logger:          logger,
 		metricsService:  metricsService,
 		dbPingService:   dbPingService,
 		metricValidator: validators.NewMetricsValidator(),
+		hasher:          utils.NewHasher(cfg.HashKey),
 	}
 }
 
 func (h *Handler) Init() *chi.Mux {
 	router := chi.NewRouter()
-	router.Use(middleware.Recoverer, h.WithLogging, GZip, WithContext)
+	router.Use(middleware.Recoverer, h.WithLogging, GZip, h.WithHashing, WithContext)
 	router.Group(func(r chi.Router) {
 		r.Post("/updates/", h.BatchUpdateMetricJSON)
 		r.Post("/update/", h.UpdateMetricJSON)

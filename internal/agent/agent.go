@@ -32,6 +32,7 @@ type MetricsAgent struct {
 	mu             *sync.Mutex
 	logger         *zerolog.Logger
 	retryIntervals map[int]time.Duration
+	hasher         *utils.Hasher
 }
 
 func NewMetricsAgent(route string, cfg *config.AgentConfig, logger *zerolog.Logger) *MetricsAgent {
@@ -50,6 +51,7 @@ func NewMetricsAgent(route string, cfg *config.AgentConfig, logger *zerolog.Logg
 			2: 3 * time.Second,
 			3: 5 * time.Second,
 		},
+		hasher: utils.NewHasher(cfg.HashKey),
 	}
 
 	// add retry mechanism
@@ -129,9 +131,24 @@ func (m *MetricsAgent) SendMetricsJSON() error {
 		m.logger.Err(pathJoinError).Caller().Str("func", "*MetricsAgent.SendMetricsJSON").Msg("url join error")
 		return fmt.Errorf("url join error: %w", pathJoinError)
 	}
+
+	headers := map[string]string{
+		"Content-Type":     "application/json",
+		"Content-Encoding": "gzip",
+	}
+
 	// send every metric retrieved from memory
 	for _, metric := range allMetrics {
 		var response models.Metrics
+
+		if m.hasher != nil {
+			hashedMetric, hashingError := m.hasher.HashMetric(metric)
+			if hashingError != nil {
+				m.logger.Err(hashingError).Caller().Str("func", "*MetricsAgent.SendMetricsJSON").Msg("error occurred during hashing metric")
+				return hashingError
+			}
+			headers["HashSHA256"] = fmt.Sprintf("%x", hashedMetric)
+		}
 
 		// gzip encode metric
 		compressedMetric, compressionError := gzipCompress(metric)
@@ -140,11 +157,9 @@ func (m *MetricsAgent) SendMetricsJSON() error {
 			return compressionError
 		}
 
+		m.logger.Debug().Any("metric", metric).Any("hash", headers["HashSHA256"]).Msg("")
 		_, sendMetricError := m.client.R().
-			SetHeaders(map[string]string{
-				"Content-Type":     "application/json",
-				"Content-Encoding": "gzip",
-			}).
+			SetHeaders(headers).
 			SetBody(compressedMetric).
 			SetResult(&response).
 			Post(route)
@@ -219,7 +234,7 @@ func (m *MetricsAgent) Run() error {
 }
 
 func newHTTPClient() *resty.Client {
-	return resty.New().SetDebug(false)
+	return resty.New().SetDebug(true)
 }
 
 func (m *MetricsAgent) getSliceOfMetrics(memStats runtime.MemStats) []models.Metrics {

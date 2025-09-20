@@ -73,19 +73,19 @@ func (m *MemStorage) UpdateGauge(ctx context.Context, metrics models.Metrics) (m
 	return result, nil
 }
 
-func (m *MemStorage) GetMetricByNameAndType(ctx context.Context, metricName string, metricType string) (models.Metrics, bool) {
+func (m *MemStorage) GetMetricByNameAndType(ctx context.Context, metricName string, metricType string) (models.Metrics, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	foundMetric, ok := m.Memory[metricName]
 	if ok {
 		if foundMetric.MType == metricType {
-			return foundMetric, true
+			return foundMetric, nil
 		}
-		return models.Metrics{}, false
+		return models.Metrics{}, ErrNotFound
 	}
 
-	return models.Metrics{}, false
+	return models.Metrics{}, ErrNotFound
 }
 
 func (m *MemStorage) GetAllMetrics(ctx context.Context) []models.Metrics {
@@ -127,7 +127,7 @@ func (m *MemStorage) SaveAll(ctx context.Context, metrics []models.Metrics) erro
 	return nil
 }
 
-func (m *MemStorage) Get(ctx context.Context, metric models.Metrics) (models.Metrics, bool) {
+func (m *MemStorage) Get(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
 	return m.GetMetricByNameAndType(ctx, metric.ID, metric.MType)
 }
 

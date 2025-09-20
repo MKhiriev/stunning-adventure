@@ -128,21 +128,21 @@ func (fs *FileStorage) SaveAll(ctx context.Context, metrics []models.Metrics) er
 	return fs.SaveMetricsToFile(ctx, metrics)
 }
 
-func (fs *FileStorage) Get(ctx context.Context, metric models.Metrics) (models.Metrics, bool) {
+func (fs *FileStorage) Get(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
 	metrics, err := fs.LoadMetricsFromFile(ctx)
 	if err != nil {
 		fs.log.Err(err).Str("func", "*FileStorage.Get").Msg("error during getting metric from file")
-		return models.Metrics{}, false
+		return models.Metrics{}, err
 	}
 
 	for _, m := range metrics {
 		if m.ID == metric.ID && m.MType == metric.MType {
-			return m, true
+			return m, nil
 		}
 	}
 
 	fs.log.Info().Str("func", "*FileStorage.Get").Msg("no metric was found")
-	return models.Metrics{}, false
+	return models.Metrics{}, ErrNotFound
 }
 
 func (fs *FileStorage) GetAll(ctx context.Context) ([]models.Metrics, error) {
