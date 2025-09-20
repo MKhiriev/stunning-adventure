@@ -150,7 +150,7 @@ func (m *MetricsAgent) SendMetricsJSON() error {
 				m.logger.Err(hashingError).Caller().Str("func", "*MetricsAgent.SendMetricsJSON").Msg("error occurred during hashing metric")
 				return hashingError
 			}
-			headers["HashSHA256"] = string(hashedMetric)
+			headers["HashSHA256"] = fmt.Sprintf("%x", hashedMetric)
 		}
 
 		// gzip encode metric
