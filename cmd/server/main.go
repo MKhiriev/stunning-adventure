@@ -45,7 +45,7 @@ func main() {
 		return
 	}
 
-	handler := handlers.NewHandler(metricsService, pingService, log)
+	handler := handlers.NewHandler(metricsService, pingService, cfg, log)
 	myServer := new(server.Server)
 	myServer.ServerRun(handler.Init(), cfg)
 }

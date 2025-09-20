@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/internal/service"
+	"github.com/MKhiriev/stunning-adventure/internal/utils"
 	"github.com/MKhiriev/stunning-adventure/internal/validators"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -13,14 +15,16 @@ type Handler struct {
 	metricsService  service.MetricsService
 	dbPingService   service.PingService
 	metricValidator validators.Validator
+	hasher          *utils.Hasher
 }
 
-func NewHandler(metricsService service.MetricsService, dbPingService service.PingService, logger *zerolog.Logger) *Handler {
+func NewHandler(metricsService service.MetricsService, dbPingService service.PingService, cfg *config.ServerConfig, logger *zerolog.Logger) *Handler {
 	return &Handler{
 		logger:          logger,
 		metricsService:  metricsService,
 		dbPingService:   dbPingService,
 		metricValidator: validators.NewMetricsValidator(),
+		hasher:          utils.NewHasher(cfg.HashKey),
 	}
 }
 
