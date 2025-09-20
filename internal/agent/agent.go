@@ -157,6 +157,7 @@ func (m *MetricsAgent) SendMetricsJSON() error {
 			return compressionError
 		}
 
+		m.logger.Debug().Any("metric", metric).Any("hash", headers["HashSHA256"]).Msg("")
 		_, sendMetricError := m.client.R().
 			SetHeaders(headers).
 			SetBody(compressedMetric).

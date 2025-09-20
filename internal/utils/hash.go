@@ -30,6 +30,7 @@ func (h *Hasher) HashByteSlice(slice []byte) ([]byte, error) {
 	}
 
 	hashedSlice := h.Sum(nil)
+	h.Reset()
 
 	return hashedSlice, nil
 }
@@ -46,6 +47,7 @@ func (h *Hasher) HashMetric(metric models.Metrics) ([]byte, error) {
 	}
 
 	hashedMetric := h.Sum(nil)
+	h.Reset()
 
 	return hashedMetric, nil
 }

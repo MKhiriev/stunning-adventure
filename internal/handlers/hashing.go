@@ -5,6 +5,9 @@ import (
 	"encoding/hex"
 	"io"
 	"net/http"
+
+	"github.com/MKhiriev/stunning-adventure/internal/utils"
+	"github.com/rs/zerolog"
 )
 
 func (h *Handler) WithHashing(next http.Handler) http.Handler {
@@ -18,7 +21,6 @@ func (h *Handler) WithHashing(next http.Handler) http.Handler {
 
 		// check if hash exists in header
 		hashFromHeader := req.Header.Get("HashSHA256")
-		h.logger.Debug().Str("func", "*Handler.WithHashing").Str("hash from header", hashFromHeader).Msg("")
 
 		if hashFromHeader == "" {
 			http.Error(w, "empty hash", http.StatusBadRequest)
@@ -42,16 +44,49 @@ func (h *Handler) WithHashing(next http.Handler) http.Handler {
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
-		h.logger.Debug().Str("func", "*Handler.WithHashing").Str("hash from header", hashFromHeader).Bytes("hash from body", hashSliceFromBody).Msg("")
+		h.logger.Debug().Str("func", "*Handler.WithHashing").Str("hash from header", hashFromHeader).Str("hash from body", hex.EncodeToString(hashSliceFromBody)).Msg("")
 
 		// compare hash from header with calculated hash from body
 		if hashFromHeader != hex.EncodeToString(hashSliceFromBody) {
+			h.logger.Debug().Str("func", "*Handler.WithHashing").Msg("hash is not valid")
 			http.Error(w, "hashes do not match", http.StatusBadRequest)
 			return
 		}
 
 		h.logger.Debug().Str("func", "*Handler.WithHashing").Msg("metric hash is valid")
 
-		next.ServeHTTP(w, req)
+		// catching response from server
+		rw := &responseWriterWithHash{ResponseWriter: w, hasher: h.hasher, logger: h.logger}
+
+		// call another middleware or handler
+		next.ServeHTTP(rw, req)
 	})
+}
+
+// responseWriterWithHash catches response from server
+type responseWriterWithHash struct {
+	http.ResponseWriter
+	hasher     *utils.Hasher
+	logger     *zerolog.Logger
+	statusCode int
+}
+
+func (rw *responseWriterWithHash) Write(p []byte) (int, error) {
+	rw.logger.Debug().
+		Str("func", "responseWriterWithHash.Write()").
+		Bytes("writer bytes", p).Msg("")
+
+	// hash body
+	if responseHash, err := rw.hasher.HashByteSlice(p); err == nil {
+		rw.Header().Set("HashSHA256", hex.EncodeToString(responseHash))
+	}
+
+	rw.WriteHeader(http.StatusOK)
+
+	rw.logger.Debug().
+		Str("func", "responseWriterWithHash.Write()").
+		Any("header", rw.Header()).
+		RawJSON("body", p).Msg("")
+
+	return rw.ResponseWriter.Write(p)
 }
