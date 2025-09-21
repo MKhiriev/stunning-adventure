@@ -83,6 +83,7 @@ func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 6. return updated metric
+	w.WriteHeader(http.StatusOK)
 	w.Write(savedMetricJSON)
 }
 
@@ -121,6 +122,7 @@ func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 5. Set header and status code
+	w.WriteHeader(http.StatusOK)
 	w.Write(foundMetricJSON)
 }
 
@@ -189,6 +191,7 @@ func (h *Handler) GetMetricValue(w http.ResponseWriter, r *http.Request) {
 
 	// if metric is present
 	h.logger.Info().Caller().Str("func", "*Handler.GetMetricValue").Any("metric", metric).Msg("found metric")
+	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(h.getValueFromMetric(metric)))
 }
 

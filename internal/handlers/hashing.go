@@ -71,6 +71,10 @@ type responseWriterWithHash struct {
 	statusCode int
 }
 
+func (rw *responseWriterWithHash) WriteHeader(statusCode int) {
+	// do nothing!
+}
+
 func (rw *responseWriterWithHash) Write(p []byte) (int, error) {
 	rw.logger.Debug().
 		Str("func", "responseWriterWithHash.Write()").
@@ -81,7 +85,7 @@ func (rw *responseWriterWithHash) Write(p []byte) (int, error) {
 		rw.Header().Set("HashSHA256", hex.EncodeToString(responseHash))
 	}
 
-	rw.WriteHeader(http.StatusOK)
+	rw.ResponseWriter.WriteHeader(http.StatusOK)
 
 	rw.logger.Debug().
 		Str("func", "responseWriterWithHash.Write()").
