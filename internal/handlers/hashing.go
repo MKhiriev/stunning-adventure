@@ -23,6 +23,7 @@ func (h *Handler) WithHashing(next http.Handler) http.Handler {
 		hashFromHeader := req.Header.Get("HashSHA256")
 
 		if hashFromHeader == "" {
+			h.logger.Error().Str("func", "*Handler.WithHashing").Any("headers", req.Header).Msg("empty hash header")
 			http.Error(w, "empty hash", http.StatusBadRequest)
 			return
 		}
@@ -30,6 +31,7 @@ func (h *Handler) WithHashing(next http.Handler) http.Handler {
 		// read request body
 		body, err := io.ReadAll(req.Body)
 		if err != nil {
+			h.logger.Err(err).Str("func", "*Handler.WithHashing").Msg("error during reading a body")
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
