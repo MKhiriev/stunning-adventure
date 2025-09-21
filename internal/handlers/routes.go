@@ -30,11 +30,15 @@ func NewHandler(metricsService service.MetricsService, dbPingService service.Pin
 
 func (h *Handler) Init() *chi.Mux {
 	router := chi.NewRouter()
-	router.Use(middleware.Recoverer, h.WithLogging, GZip, h.WithHashing, WithContext)
+	router.Use(middleware.Recoverer, h.WithLogging, WithContext)
 	router.Group(func(r chi.Router) {
+		r.Use(GZip, h.WithHashing, h.WriteResponseWithHashing)
 		r.Post("/updates/", h.BatchUpdateMetricJSON)
 		r.Post("/update/", h.UpdateMetricJSON)
 		r.Post("/value/", h.GetMetricJSON)
+	})
+
+	router.Group(func(r chi.Router) {
 		r.Post("/update/{metricType}/{metricName}/{metricValue}", h.MetricHandler)
 		r.Get("/value/{metricType}/{metricName}", h.GetMetricValue)
 		r.Get("/", h.GetAllMetrics)
