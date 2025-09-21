@@ -36,12 +36,12 @@ func (h *Handler) Init() *chi.Mux {
 		r.Post("/updates/", h.BatchUpdateMetricJSON)
 		r.Post("/update/", h.UpdateMetricJSON)
 		r.Post("/value/", h.GetMetricJSON)
+		r.Get("/", h.GetAllMetrics)
 	})
 
 	router.Group(func(r chi.Router) {
 		r.Post("/update/{metricType}/{metricName}/{metricValue}", h.MetricHandler)
 		r.Get("/value/{metricType}/{metricName}", h.GetMetricValue)
-		r.Get("/", h.GetAllMetrics)
 	})
 
 	router.Group(func(r chi.Router) {
