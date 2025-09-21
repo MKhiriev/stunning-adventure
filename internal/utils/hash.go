@@ -51,3 +51,9 @@ func (h *Hasher) HashMetric(metric models.Metrics) ([]byte, error) {
 
 	return hashedMetric, nil
 }
+
+func Hash(data []byte, hashKey string) []byte {
+	hasher := hmac.New(sha256.New, []byte(hashKey))
+	hasher.Write(data)
+	return hasher.Sum(nil)
+}

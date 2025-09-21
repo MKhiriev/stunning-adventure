@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"bytes"
+	"io"
 	"net/http"
 	"time"
 
@@ -12,6 +14,9 @@ const timeout = 10 * time.Second
 
 func (h *Handler) WithLogging(handler http.Handler) http.Handler {
 	logFn := func(w http.ResponseWriter, r *http.Request) {
+		h.logger.Info().
+			Any("incoming request headers", r.Header).
+			Msg("request")
 		start := time.Now()
 
 		uri := r.RequestURI
@@ -30,12 +35,22 @@ func (h *Handler) WithLogging(handler http.Handler) http.Handler {
 
 		duration := time.Since(start)
 
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			h.logger.Err(err).Str("func", "*Handler.WithHashing").Msg("failed to read request body")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		r.Body = io.NopCloser(bytes.NewReader(body))
+
 		h.logger.Info().
 			Str("uri", uri).
 			Str("method", method).
-			Int("status", responseData.status).
+			Bytes("body", lw.responseData.body).
+			Any("headers", lw.Header()).
+			Int("status", lw.responseData.status).
 			Dur("duration", duration).
-			Int("size", responseData.size).
+			Int("size", lw.responseData.size).
 			Msg("")
 	}
 
@@ -80,6 +95,7 @@ type (
 	responseData struct {
 		status int
 		size   int
+		body   []byte
 	}
 
 	loggingResponseWriter struct {
@@ -89,6 +105,7 @@ type (
 )
 
 func (r *loggingResponseWriter) Write(b []byte) (int, error) {
+	r.responseData.body = b
 	size, err := r.ResponseWriter.Write(b)
 	r.responseData.size += size
 	return size, err
