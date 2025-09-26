@@ -12,6 +12,7 @@ type AgentConfig struct {
 	ReportInterval int64  `env:"REPORT_INTERVAL"`
 	PollInterval   int64  `env:"POLL_INTERVAL"`
 	HashKey        string `env:"KEY"`
+	RateLimit      int64  `env:"RATE_LIMIT"`
 }
 
 type ServerConfig struct {
@@ -36,7 +37,7 @@ func GetAgentConfigs() *AgentConfig {
 	}
 
 	// else get command line args or default values
-	commandLineServerAddress, commandLinePollInterval, commandLineReportInterval, commandLineHashKey := ParseAgentFlags()
+	commandLineServerAddress, commandLinePollInterval, commandLineReportInterval, commandLineHashKey, commandLineRateLimit := ParseAgentFlags()
 
 	if cfg.ServerAddress == "" {
 		cfg.ServerAddress = commandLineServerAddress
@@ -49,6 +50,9 @@ func GetAgentConfigs() *AgentConfig {
 	}
 	if cfg.HashKey == "" {
 		cfg.HashKey = commandLineHashKey
+	}
+	if cfg.RateLimit == 0 {
+		cfg.RateLimit = commandLineRateLimit
 	}
 
 	return cfg

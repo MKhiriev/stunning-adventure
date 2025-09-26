@@ -17,6 +17,7 @@ const (
 	defaultRestoreValue    = false
 	defaultDatabaseDSN     = ""
 	defaultHashKey         = ""
+	defaultRateLimit       = int64(1)
 )
 
 type NetAddress struct {
@@ -40,7 +41,7 @@ func ParseServerFlags() (netAddress string, storeInterval int64, fileStoragePath
 	return serverAddress.String(), storeInterval, fileStoragePath, restore, databaseDSN, hashKey
 }
 
-func ParseAgentFlags() (netAddress string, pollInterval int64, reportInterval int64, hashKey string) {
+func ParseAgentFlags() (netAddress string, pollInterval int64, reportInterval int64, hashKey string, rateLimit int64) {
 	serverAddress := NetAddress{}
 	_ = flag.Value(&serverAddress)
 
@@ -48,10 +49,11 @@ func ParseAgentFlags() (netAddress string, pollInterval int64, reportInterval in
 	flag.Int64Var(&pollInterval, "p", defaultPollInterval, "Poll interval in seconds")
 	flag.Int64Var(&reportInterval, "r", defaultReportInterval, "Report interval in seconds")
 	flag.StringVar(&hashKey, "k", defaultHashKey, "Hash key for hashing")
+	flag.Int64Var(&rateLimit, "l", defaultRateLimit, "Concurrent request limit to the server")
 
 	flag.Parse()
 
-	return serverAddress.String(), pollInterval, reportInterval, hashKey
+	return serverAddress.String(), pollInterval, reportInterval, hashKey, rateLimit
 }
 
 func (a *NetAddress) String() string {
