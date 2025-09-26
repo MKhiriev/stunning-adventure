@@ -19,6 +19,8 @@ import (
 	"github.com/MKhiriev/stunning-adventure/models"
 	"github.com/go-resty/resty/v2"
 	"github.com/rs/zerolog"
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/mem"
 )
 
 type MetricsAgent struct {
@@ -239,7 +241,10 @@ func newHTTPClient() *resty.Client {
 
 func (m *MetricsAgent) getSliceOfMetrics(memStats runtime.MemStats) []models.Metrics {
 	m.pollCount++
-	return []models.Metrics{
+	var metrics []models.Metrics
+	virtualMem, _ := mem.VirtualMemory()
+
+	metrics = []models.Metrics{
 		gaugeMetric("Alloc", float64(memStats.Alloc)),
 		gaugeMetric("BuckHashSys", float64(memStats.BuckHashSys)),
 		gaugeMetric("Frees", float64(memStats.Frees)),
@@ -269,7 +274,16 @@ func (m *MetricsAgent) getSliceOfMetrics(memStats runtime.MemStats) []models.Met
 		gaugeMetric("TotalAlloc", float64(memStats.TotalAlloc)),
 		counterMetric("PollCount", m.pollCount),
 		gaugeMetric("RandomValue", rand.Float64()),
+		gaugeMetric("TotalMemory", float64(virtualMem.Total)),
+		gaugeMetric("FreeMemory", float64(virtualMem.Free)),
 	}
+
+	allCPUs, _ := cpu.Percent(time.Second, true)
+	for i, cpuPercentage := range allCPUs {
+		metrics = append(metrics, gaugeMetric(fmt.Sprintf("CPUutilization%d", i), cpuPercentage))
+	}
+
+	return metrics
 }
 
 func (m *MetricsAgent) getRoute(metric models.Metrics) (string, error) {
