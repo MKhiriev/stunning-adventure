@@ -32,7 +32,7 @@ func GetAgentConfigs() *AgentConfig {
 	}
 
 	// if all values are not nil return cfg
-	if cfg.ServerAddress != "" && cfg.ReportInterval != 0 && cfg.PollInterval != 0 {
+	if cfg.ServerAddress != "" && cfg.ReportInterval != 0 && cfg.PollInterval != 0 && cfg.RateLimit != 0 {
 		return cfg
 	}
 
