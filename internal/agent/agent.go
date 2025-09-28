@@ -250,13 +250,9 @@ func (m *MetricsAgent) ReadMetricsGenerator(pollInterval *time.Ticker, reportInt
 
 // SendMetricsWorker this func we run in separate goroutines
 func (m *MetricsAgent) SendMetricsWorker(metrics <-chan models.Metrics) {
-	for {
-		select {
-		case metric := <-metrics:
-			m.logger.Debug().Any("metric", metric).Msg("worker is called")
-			_ = m.sendMetric(metric)
-
-		}
+	for metric := range metrics {
+		m.logger.Debug().Any("metric", metric).Msg("worker is called")
+		_ = m.sendMetric(metric)
 	}
 }
 
