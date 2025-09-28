@@ -26,7 +26,7 @@ func TestReadMetrics(t *testing.T) {
 		{
 			name: "positive test #1",
 			want: want{
-				length: 29,
+				length: 41,
 			},
 		},
 	}
