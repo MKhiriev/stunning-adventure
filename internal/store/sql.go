@@ -33,8 +33,7 @@ type DB struct {
 	maxAttempts        int
 }
 
-func NewConnectPostgres(cfg *config.ServerConfig, log *zerolog.Logger) (*DB, error) {
-	ctx := context.Background()
+func NewConnectPostgres(ctx context.Context, cfg *config.ServerConfig, log *zerolog.Logger) (*DB, error) {
 	// establish connection
 	conn, err := sql.Open("pgx", cfg.DatabaseDSN)
 	if err != nil {

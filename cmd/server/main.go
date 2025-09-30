@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+
 	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/internal/handlers"
 	"github.com/MKhiriev/stunning-adventure/internal/logger"
@@ -10,6 +12,7 @@ import (
 )
 
 func main() {
+	ctx := context.Background()
 	log := logger.NewLogger("metrics-server")
 	cfg, err := config.GetServerConfigs()
 	if err != nil {
@@ -19,11 +22,11 @@ func main() {
 	log.Info().Any("cfg-srv", cfg).Msg("Server started")
 
 	memStorage := store.NewMemStorage(log)
-	conn, err := store.NewConnectPostgres(cfg, log)
+	conn, err := store.NewConnectPostgres(ctx, cfg, log)
 	if err != nil {
 		log.Err(err).Msg("connection to database failed")
 	}
-	fileStorage, err := store.NewFileStorage(memStorage, cfg, log)
+	fileStorage, err := store.NewFileStorage(ctx, memStorage, cfg, log)
 	if err != nil {
 		log.Err(err).Msg("file storage creation failed")
 	}

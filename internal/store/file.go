@@ -19,7 +19,7 @@ type FileStorage struct {
 	fullFileName string
 }
 
-func NewFileStorage(memStorage *MemStorage, cfg *config.ServerConfig, log *zerolog.Logger) (*FileStorage, error) {
+func NewFileStorage(ctx context.Context, memStorage *MemStorage, cfg *config.ServerConfig, log *zerolog.Logger) (*FileStorage, error) {
 	if cfg.FileStoragePath == "" {
 		log.Error().Msg("no file storage path was provided")
 		return nil, errors.New("no file storage path was provided")
@@ -40,7 +40,7 @@ func NewFileStorage(memStorage *MemStorage, cfg *config.ServerConfig, log *zerol
 
 	// load metrics from file if needed
 	if cfg.RestoreMetricsFromFile {
-		metricsFromFile, err := fs.LoadMetricsFromFile(context.TODO())
+		metricsFromFile, err := fs.LoadMetricsFromFile(ctx)
 		if err != nil {
 			fs.log.Err(err).Str("func", "store.NewFileStorage").Msg("error loading metrics from file")
 			return nil, err
