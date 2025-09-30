@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"html/template"
@@ -15,6 +14,7 @@ import (
 )
 
 func (h *Handler) BatchUpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	var metricsFromBody []models.Metrics
 
 	// Get JSON from the body
@@ -27,7 +27,7 @@ func (h *Handler) BatchUpdateMetricJSON(w http.ResponseWriter, r *http.Request) 
 	h.logger.Info().Str("func", "*Handler.BatchUpdateMetricJSON").Interface("metrics from body", metricsFromBody).Msg("BatchUpdateMetricJSON was called!")
 
 	// update all values + validation
-	if err := h.metricsService.SaveAll(context.TODO(), metricsFromBody); err != nil {
+	if err := h.metricsService.SaveAll(ctx, metricsFromBody); err != nil {
 		switch {
 		case errors.Is(err, validators.ErrEmptyID) || errors.Is(err, validators.ErrEmptyType) || errors.Is(err, validators.ErrNoValue) || errors.Is(err, validators.ErrInvalidType):
 			h.logger.Err(err).Caller().Str("func", "*Handler.BatchUpdateMetricJSON").Msg("passed metric is not valid")
@@ -46,6 +46,7 @@ func (h *Handler) BatchUpdateMetricJSON(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	var metricFromBody models.Metrics
 
 	// 1. Get JSON from the body
@@ -59,7 +60,7 @@ func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	// 3. Update metric's value based on it's type + validation
-	if metricFromBody, err = h.metricsService.Save(context.TODO(), metricFromBody); err != nil {
+	if metricFromBody, err = h.metricsService.Save(ctx, metricFromBody); err != nil {
 		switch {
 		case errors.Is(err, validators.ErrEmptyID) || errors.Is(err, validators.ErrEmptyType) || errors.Is(err, validators.ErrNoValue) || errors.Is(err, validators.ErrInvalidType):
 			h.logger.Err(err).Caller().Str("func", "*Handler.UpdateMetricJSON").Any("metric", metricFromBody).Msg("passed metric is not valid")
@@ -88,6 +89,7 @@ func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	w.Header().Set("Content-Type", "application/json")
 	var metric models.Metrics
 
@@ -99,7 +101,7 @@ func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 3. Find metric in memory
-	foundMetric, err := h.metricsService.Get(context.TODO(), metric)
+	foundMetric, err := h.metricsService.Get(ctx, metric)
 	if err != nil {
 		switch {
 		case errors.Is(err, store.ErrNotFound):
@@ -131,6 +133,7 @@ func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) MetricHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	w.Header().Add("Content-Type", "text/plain")
 
 	metric := models.Metrics{
@@ -140,7 +143,7 @@ func (h *Handler) MetricHandler(w http.ResponseWriter, r *http.Request) {
 	metricValue := chi.URLParam(r, "metricValue")
 
 	// check passed metric name and type
-	if err := h.metricValidator.Validate(context.TODO(), metric, validators.ID, validators.MType); err != nil {
+	if err := h.metricValidator.Validate(ctx, metric, validators.ID, validators.MType); err != nil {
 		switch {
 		case errors.Is(err, validators.ErrEmptyID):
 			h.logger.Err(err).Caller().Str("func", "*Handler.MetricHandler").Msg("metric name (id) is empty or not found")
@@ -162,7 +165,7 @@ func (h *Handler) MetricHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = h.metricsService.Save(context.TODO(), metric)
+	_, err = h.metricsService.Save(ctx, metric)
 	if err != nil {
 		h.logger.Err(err).Caller().Str("func", "*Handler.MetricHandler").Msg("error during saving metric")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -173,12 +176,13 @@ func (h *Handler) MetricHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetMetricValue(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	w.Header().Add("Content-Type", "text/plain")
 	id := chi.URLParam(r, "metricName")
 	mType := chi.URLParam(r, "metricType")
 
 	// business logic + validation
-	metric, err := h.metricsService.Get(context.TODO(), models.Metrics{ID: id, MType: mType})
+	metric, err := h.metricsService.Get(ctx, models.Metrics{ID: id, MType: mType})
 
 	if err != nil {
 		switch {
@@ -200,6 +204,7 @@ func (h *Handler) GetMetricValue(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	// TODO hide all HTML creation logic under new service
 	html, err := template.ParseFiles("web/template/all-metrics.html", "web/template/metrics-list.html")
 	if err != nil || html == nil {
@@ -208,7 +213,7 @@ func (h *Handler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	allMetrics, err := h.metricsService.GetAll(context.TODO())
+	allMetrics, err := h.metricsService.GetAll(ctx)
 	if err != nil {
 		h.logger.Err(err).Caller().Str("func", "*Handler.GetAllMetrics").Msg("error getting all metrics from storage")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
