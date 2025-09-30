@@ -129,7 +129,7 @@ func (m *MetricsAgent) SendMetricsJSON() error {
 
 	// send every metric retrieved from memory
 	for _, metric := range allMetrics {
-		err := m.sendMetric(metric)
+		err := m.sendMetrics(metric)
 		if err != nil {
 			return err
 		}
@@ -141,11 +141,15 @@ func (m *MetricsAgent) SendMetricsJSON() error {
 	return nil
 }
 
-func (m *MetricsAgent) sendMetric(metric ...models.Metrics) error {
+func (m *MetricsAgent) sendMetrics(metric ...models.Metrics) error {
+	if len(metric) == 0 {
+		m.logger.Error().Caller().Str("func", "*MetricsAgent.sendMetrics").Msg("no metric was passed!")
+		return errors.New("no metric was passed")
+	}
 	// construct a route
 	route, pathJoinError := url.JoinPath(m.serverAddress, m.route, "/")
 	if pathJoinError != nil {
-		m.logger.Err(pathJoinError).Caller().Str("func", "*MetricsAgent.sendMetric").Msg("url join error")
+		m.logger.Err(pathJoinError).Caller().Str("func", "*MetricsAgent.sendMetrics").Msg("url join error")
 		return fmt.Errorf("url join error: %w", pathJoinError)
 	}
 
@@ -159,7 +163,7 @@ func (m *MetricsAgent) sendMetric(metric ...models.Metrics) error {
 	if m.hasher != nil {
 		hashedMetric, hashingError := m.hasher.HashMetrics(metric...)
 		if hashingError != nil {
-			m.logger.Err(hashingError).Caller().Str("func", "*MetricsAgent.sendMetric").Msg("error occurred during hashing metric")
+			m.logger.Err(hashingError).Caller().Str("func", "*MetricsAgent.sendMetrics").Msg("error occurred during hashing metric")
 			return hashingError
 		}
 		headers["HashSHA256"] = fmt.Sprintf("%x", hashedMetric)
@@ -168,7 +172,7 @@ func (m *MetricsAgent) sendMetric(metric ...models.Metrics) error {
 	// gzip encode metric
 	compressedMetric, compressionError := gzipCompress(metric...)
 	if compressionError != nil {
-		m.logger.Err(compressionError).Caller().Str("func", "*MetricsAgent.sendMetric").Msg("error occurred during gzip compression")
+		m.logger.Err(compressionError).Caller().Str("func", "*MetricsAgent.sendMetrics").Msg("error occurred during gzip compression")
 		return compressionError
 	}
 
@@ -181,11 +185,11 @@ func (m *MetricsAgent) sendMetric(metric ...models.Metrics) error {
 		SetResult(&response).
 		Post(route)
 	if sendMetricError != nil {
-		m.logger.Err(sendMetricError).Caller().Str("func", "*MetricsAgent.sendMetric").Msg("error occurred during sending metric")
+		m.logger.Err(sendMetricError).Caller().Str("func", "*MetricsAgent.sendMetrics").Msg("error occurred during sending metric")
 		return fmt.Errorf("error occurred during sending metric: %w", sendMetricError)
 	}
 
-	m.logger.Info().Caller().Str("func", "*MetricsAgent.sendMetric").Any("request", compressedMetric).Any("response", response).Msg("metric is sent!")
+	m.logger.Info().Caller().Str("func", "*MetricsAgent.sendMetrics").Any("request", compressedMetric).Any("response", response).Msg("metric is sent!")
 	return nil
 }
 
@@ -219,6 +223,7 @@ func (m *MetricsAgent) SendMetrics() error {
 			return fmt.Errorf("error during metrics sending: %s", response.Status())
 		}
 	}
+
 	// after sending metrics set poll count to 0
 	m.pollCount = 0
 	return nil
@@ -227,7 +232,6 @@ func (m *MetricsAgent) SendMetrics() error {
 // ReadMetricsGenerator reads metrics and returns a channel that will feed the worker metrics for sending
 func (m *MetricsAgent) ReadMetricsGenerator(pollInterval *time.Ticker, reportInterval *time.Ticker) chan []models.Metrics {
 	metricsChannel := make(chan []models.Metrics)
-	//metricsChannel := make(chan models.Metrics)
 
 	go func() {
 		for {
@@ -239,10 +243,6 @@ func (m *MetricsAgent) ReadMetricsGenerator(pollInterval *time.Ticker, reportInt
 				m.logger.Debug().Str("func", "ReadMetricsGenerator").Msg("time to SEND metrics")
 				allMetrics := m.memory.GetAllMetrics()
 				metricsChannel <- allMetrics
-				//for _, metric := range allMetrics {
-				//	m.logger.Debug().Str("func", "ReadMetricsGenerator").Any("metric", metric).Msg("metric is sent to the channel")
-				//	metricsChannel <- metric
-				//}
 			}
 		}
 	}()
@@ -251,10 +251,11 @@ func (m *MetricsAgent) ReadMetricsGenerator(pollInterval *time.Ticker, reportInt
 }
 
 // SendMetricsWorker this func we run in separate goroutines
-func (m *MetricsAgent) SendMetricsWorker(metrics <-chan []models.Metrics) {
-	for metric := range metrics {
-		m.logger.Debug().Any("metric", metric).Msg("worker is called")
-		_ = m.sendMetric(metric...)
+func (m *MetricsAgent) SendMetricsWorker(metricBatches <-chan []models.Metrics) {
+	for batch := range metricBatches {
+		m.logger.Debug().Any("batch", batch).Msg("worker is called")
+		_ = m.sendMetrics(batch...)
+		m.pollCount = 0
 	}
 }
 
