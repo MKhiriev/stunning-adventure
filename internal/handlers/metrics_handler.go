@@ -40,8 +40,6 @@ func (h *Handler) BatchUpdateMetricJSON(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	// 4. Set Content type to `application/json`
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 }
 
