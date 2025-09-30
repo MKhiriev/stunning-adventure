@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 
 	"github.com/MKhiriev/stunning-adventure/models"
 )
@@ -22,16 +23,26 @@ func NewHasher(hashKey string) *Hasher {
 	return nil
 }
 
-func (h *Hasher) HashMetric(metric models.Metrics) ([]byte, error) {
-	metricJSON, err := json.Marshal(metric)
-	if err != nil {
-		return nil, err
+func (h *Hasher) HashMetrics(metrics ...models.Metrics) ([]byte, error) {
+	var metricJSON []byte
+	var err error
+
+	if len(metrics) == 1 {
+		metricJSON, err = json.Marshal(metrics[0])
+		if err != nil {
+			return nil, fmt.Errorf("error during json marshalling metric: %w", err)
+		}
+	} else {
+		metricJSON, err = json.Marshal(metrics)
+		if err != nil {
+			return nil, fmt.Errorf("error during json marshalling metrics: %w", err)
+		}
 	}
 
 	hasher := hmac.New(sha256.New, h.hashKey)
 	_, err = hasher.Write(metricJSON)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error during hashing metric(s): %w", err)
 	}
 
 	hashedMetric := hasher.Sum(nil)

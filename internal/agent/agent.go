@@ -141,7 +141,7 @@ func (m *MetricsAgent) SendMetricsJSON() error {
 	return nil
 }
 
-func (m *MetricsAgent) sendMetric(metric models.Metrics) error {
+func (m *MetricsAgent) sendMetric(metric ...models.Metrics) error {
 	// construct a route
 	route, pathJoinError := url.JoinPath(m.serverAddress, m.route, "/")
 	if pathJoinError != nil {
@@ -157,7 +157,7 @@ func (m *MetricsAgent) sendMetric(metric models.Metrics) error {
 
 	// include hash of the body
 	if m.hasher != nil {
-		hashedMetric, hashingError := m.hasher.HashMetric(metric)
+		hashedMetric, hashingError := m.hasher.HashMetrics(metric...)
 		if hashingError != nil {
 			m.logger.Err(hashingError).Caller().Str("func", "*MetricsAgent.sendMetric").Msg("error occurred during hashing metric")
 			return hashingError
@@ -166,7 +166,7 @@ func (m *MetricsAgent) sendMetric(metric models.Metrics) error {
 	}
 
 	// gzip encode metric
-	compressedMetric, compressionError := gzipCompress(metric)
+	compressedMetric, compressionError := gzipCompress(metric...)
 	if compressionError != nil {
 		m.logger.Err(compressionError).Caller().Str("func", "*MetricsAgent.sendMetric").Msg("error occurred during gzip compression")
 		return compressionError
@@ -226,6 +226,7 @@ func (m *MetricsAgent) SendMetrics() error {
 
 // ReadMetricsGenerator reads metrics and returns a channel that will feed the worker metrics for sending
 func (m *MetricsAgent) ReadMetricsGenerator(pollInterval *time.Ticker, reportInterval *time.Ticker) chan models.Metrics {
+	//metricsChannel := make(chan []models.Metrics)
 	metricsChannel := make(chan models.Metrics)
 
 	go func() {
@@ -237,6 +238,7 @@ func (m *MetricsAgent) ReadMetricsGenerator(pollInterval *time.Ticker, reportInt
 			case <-reportInterval.C:
 				m.logger.Debug().Str("func", "ReadMetricsGenerator").Msg("time to SEND metrics")
 				allMetrics := m.memory.GetAllMetrics()
+				//metricsChannel <- allMetrics
 				for _, metric := range allMetrics {
 					m.logger.Debug().Str("func", "ReadMetricsGenerator").Any("metric", metric).Msg("metric is sent to the channel")
 					metricsChannel <- metric
@@ -314,11 +316,21 @@ func (m *MetricsAgent) getRoute(metric models.Metrics) (string, error) {
 	return "", errors.New("error occurred during route construction")
 }
 
-func gzipCompress(metric models.Metrics) ([]byte, error) {
-	// сериализуем metric в JSON
-	jsonData, err := json.Marshal(metric)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal metric: %w", err)
+func gzipCompress(metric ...models.Metrics) ([]byte, error) {
+	var jsonData []byte
+	var err error
+
+	if len(metric) == 1 {
+		jsonData, err = json.Marshal(metric[0])
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal metric: %w", err)
+		}
+	} else {
+		// сериализуем metric в JSON
+		jsonData, err = json.Marshal(metric)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal metrics: %w", err)
+		}
 	}
 
 	// создаем gzip-сжатие
