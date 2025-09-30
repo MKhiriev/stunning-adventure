@@ -45,6 +45,7 @@ func NewFileStorage(ctx context.Context, memStorage *MemStorage, cfg *config.Ser
 			fs.log.Err(err).Str("func", "store.NewFileStorage").Msg("error loading metrics from file")
 			return nil, err
 		}
+		fs.log.Debug().Str("func", "store.NewFileStorage").Any("metrics", metricsFromFile).Msg("restored metrics from file")
 		for _, metric := range metricsFromFile {
 			fs.memStorage.Memory[metric.ID] = metric
 		}
@@ -125,6 +126,7 @@ func (fs *FileStorage) Save(ctx context.Context, metric models.Metrics) (models.
 }
 
 func (fs *FileStorage) SaveAll(ctx context.Context, metrics []models.Metrics) error {
+	fs.log.Debug().Str("func", "*FileStorage.SaveAll").Any("metrics", metrics).Msg("trying to save all metrics")
 	return fs.SaveMetricsToFile(ctx, metrics)
 }
 
