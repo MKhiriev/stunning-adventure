@@ -7,14 +7,13 @@ import (
 	"time"
 
 	"github.com/MKhiriev/stunning-adventure/models"
-	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/gopsutil/mem"
+	"github.com/shirou/gopsutil/v4/cpu"
+	"github.com/shirou/gopsutil/v4/mem"
 )
 
 func (m *MetricsAgent) getSliceOfMetrics(memStats runtime.MemStats) []models.Metrics {
 	m.pollCount++
 	var metrics []models.Metrics
-	virtualMem, _ := mem.VirtualMemory()
 
 	metrics = []models.Metrics{
 		gaugeMetric("Alloc", float64(memStats.Alloc)),
@@ -46,13 +45,25 @@ func (m *MetricsAgent) getSliceOfMetrics(memStats runtime.MemStats) []models.Met
 		gaugeMetric("TotalAlloc", float64(memStats.TotalAlloc)),
 		counterMetric("PollCount", m.pollCount),
 		gaugeMetric("RandomValue", rand.Float64()),
-		gaugeMetric("TotalMemory", float64(virtualMem.Total)),
-		gaugeMetric("FreeMemory", float64(virtualMem.Free)),
 	}
 
-	allCPUs, _ := cpu.Percent(time.Second, true)
-	for i, cpuPercentage := range allCPUs {
-		metrics = append(metrics, gaugeMetric(fmt.Sprintf("CPUutilization%d", i), cpuPercentage))
+	virtualMem, err := mem.VirtualMemory()
+	if err != nil {
+		m.logger.Err(err).Msg(`error occurred during reading "TotalMemory" and "FreeMemory" stats`)
+	} else {
+		metrics = append(metrics,
+			gaugeMetric("TotalMemory", float64(virtualMem.Total)),
+			gaugeMetric("FreeMemory", float64(virtualMem.Free)),
+		)
+	}
+
+	allCPUs, err := cpu.Percent(time.Second, true)
+	if err != nil {
+		m.logger.Err(err).Msg(`error occurred during reading "CPUutilization" stats`)
+	} else {
+		for i, cpuPercentage := range allCPUs {
+			metrics = append(metrics, gaugeMetric(fmt.Sprintf("CPUutilization%d", i), cpuPercentage))
+		}
 	}
 
 	return metrics
