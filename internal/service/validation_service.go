@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/MKhiriev/stunning-adventure/internal/validators"
 	"github.com/MKhiriev/stunning-adventure/models"
@@ -26,7 +27,7 @@ func (v *ValidatingMetricsService) Save(ctx context.Context, metric models.Metri
 
 	if err := v.validator.Validate(ctx, metric); err != nil {
 		v.log.Info().Str("func", "*ValidatingMetricsService.Save").Any("metric", metric).Msg("metric is not valid")
-		return models.Metrics{}, err
+		return models.Metrics{}, fmt.Errorf("error during metric validation before saving: %w", err)
 	}
 
 	v.log.Info().Str("func", "*ValidatingMetricsService.Save").Any("metric", metric).Msg("metric is valid")
@@ -40,7 +41,7 @@ func (v *ValidatingMetricsService) SaveAll(ctx context.Context, metrics []models
 	for _, metric := range metrics {
 		if err := v.validator.Validate(ctx, metric); err != nil {
 			v.log.Err(err).Str("func", "*ValidatingMetricsService.SaveAll").Any("metrics", metric).Msg("metric is not valid")
-			return err
+			return fmt.Errorf("error during metric validation before saving: %w", err)
 		}
 	}
 
@@ -52,9 +53,9 @@ func (v *ValidatingMetricsService) SaveAll(ctx context.Context, metrics []models
 func (v *ValidatingMetricsService) Get(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
 	v.log.Info().Str("func", "*ValidatingMetricsService.Get").Any("metrics", metric).Msg("validation before Get() started")
 
-	if err := v.validator.Validate(context.TODO(), metric, validators.ID, validators.MType); err != nil {
+	if err := v.validator.Validate(ctx, metric, validators.ID, validators.MType); err != nil {
 		v.log.Info().Str("func", "*ValidatingMetricsService.Get").Any("metrics", metric).Msg("metric is not valid")
-		return models.Metrics{}, err
+		return models.Metrics{}, fmt.Errorf("error during metric validation before saving: %w", err)
 	}
 
 	v.log.Info().Str("func", "*ValidatingMetricsService.Get").Any("metrics", metric).Msg("metric is valid")

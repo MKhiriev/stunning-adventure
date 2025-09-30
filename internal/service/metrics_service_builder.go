@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/internal/store"
@@ -51,7 +52,7 @@ func (b *MetricsServiceBuilder) Build() (MetricsService, error) {
 	b.log.Info().Str("func", "MetricsServiceBuilder.Build").Msg("started building MetricsService")
 	service, err := b.buildMetricsService()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error occurred during building metrics service %w", err)
 	}
 
 	// adding wrappers if they exist
