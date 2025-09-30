@@ -225,9 +225,9 @@ func (m *MetricsAgent) SendMetrics() error {
 }
 
 // ReadMetricsGenerator reads metrics and returns a channel that will feed the worker metrics for sending
-func (m *MetricsAgent) ReadMetricsGenerator(pollInterval *time.Ticker, reportInterval *time.Ticker) chan models.Metrics {
-	//metricsChannel := make(chan []models.Metrics)
-	metricsChannel := make(chan models.Metrics)
+func (m *MetricsAgent) ReadMetricsGenerator(pollInterval *time.Ticker, reportInterval *time.Ticker) chan []models.Metrics {
+	metricsChannel := make(chan []models.Metrics)
+	//metricsChannel := make(chan models.Metrics)
 
 	go func() {
 		for {
@@ -238,11 +238,11 @@ func (m *MetricsAgent) ReadMetricsGenerator(pollInterval *time.Ticker, reportInt
 			case <-reportInterval.C:
 				m.logger.Debug().Str("func", "ReadMetricsGenerator").Msg("time to SEND metrics")
 				allMetrics := m.memory.GetAllMetrics()
-				//metricsChannel <- allMetrics
-				for _, metric := range allMetrics {
-					m.logger.Debug().Str("func", "ReadMetricsGenerator").Any("metric", metric).Msg("metric is sent to the channel")
-					metricsChannel <- metric
-				}
+				metricsChannel <- allMetrics
+				//for _, metric := range allMetrics {
+				//	m.logger.Debug().Str("func", "ReadMetricsGenerator").Any("metric", metric).Msg("metric is sent to the channel")
+				//	metricsChannel <- metric
+				//}
 			}
 		}
 	}()
@@ -251,10 +251,10 @@ func (m *MetricsAgent) ReadMetricsGenerator(pollInterval *time.Ticker, reportInt
 }
 
 // SendMetricsWorker this func we run in separate goroutines
-func (m *MetricsAgent) SendMetricsWorker(metrics <-chan models.Metrics) {
+func (m *MetricsAgent) SendMetricsWorker(metrics <-chan []models.Metrics) {
 	for metric := range metrics {
 		m.logger.Debug().Any("metric", metric).Msg("worker is called")
-		_ = m.sendMetric(metric)
+		_ = m.sendMetric(metric...)
 	}
 }
 
