@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"runtime"
@@ -32,6 +31,8 @@ type MetricsAgent struct {
 	mu             *sync.Mutex
 	logger         *zerolog.Logger
 	retryIntervals map[int]time.Duration
+	hasher         *utils.Hasher
+	rateLimit      int64
 }
 
 func NewMetricsAgent(route string, cfg *config.AgentConfig, logger *zerolog.Logger) *MetricsAgent {
@@ -50,6 +51,8 @@ func NewMetricsAgent(route string, cfg *config.AgentConfig, logger *zerolog.Logg
 			2: 3 * time.Second,
 			3: 5 * time.Second,
 		},
+		hasher:    utils.NewHasher(cfg.HashKey),
+		rateLimit: cfg.RateLimit,
 	}
 
 	// add retry mechanism
@@ -124,40 +127,69 @@ func (m *MetricsAgent) SendMetricsJSON() error {
 		return errors.New("no metrics passed")
 	}
 
-	route, pathJoinError := url.JoinPath(m.serverAddress, m.route, "/")
-	if pathJoinError != nil {
-		m.logger.Err(pathJoinError).Caller().Str("func", "*MetricsAgent.SendMetricsJSON").Msg("url join error")
-		return fmt.Errorf("url join error: %w", pathJoinError)
-	}
 	// send every metric retrieved from memory
 	for _, metric := range allMetrics {
-		var response models.Metrics
-
-		// gzip encode metric
-		compressedMetric, compressionError := gzipCompress(metric)
-		if compressionError != nil {
-			m.logger.Err(compressionError).Caller().Str("func", "*MetricsAgent.SendMetricsJSON").Msg("error occurred during gzip compression")
-			return compressionError
+		err := m.sendMetrics(metric)
+		if err != nil {
+			return err
 		}
-
-		_, sendMetricError := m.client.R().
-			SetHeaders(map[string]string{
-				"Content-Type":     "application/json",
-				"Content-Encoding": "gzip",
-			}).
-			SetBody(compressedMetric).
-			SetResult(&response).
-			Post(route)
-		if sendMetricError != nil {
-			m.logger.Err(sendMetricError).Caller().Str("func", "*MetricsAgent.SendMetricsJSON").Msg("error occurred during sending metric")
-			return fmt.Errorf("error occurred during sending metric: %w", sendMetricError)
-		}
-
-		m.logger.Info().Caller().Str("func", "*MetricsAgent.SendMetricsJSON").Any("request", compressedMetric).Any("response", response).Msg("request & response from server")
 	}
+
 	// after sending metrics set poll count to 0
 	m.pollCount = 0
 
+	return nil
+}
+
+func (m *MetricsAgent) sendMetrics(metric ...models.Metrics) error {
+	if len(metric) == 0 {
+		m.logger.Error().Caller().Str("func", "*MetricsAgent.sendMetrics").Msg("no metric was passed!")
+		return errors.New("no metric was passed")
+	}
+	// construct a route
+	route, pathJoinError := url.JoinPath(m.serverAddress, m.route, "/")
+	if pathJoinError != nil {
+		m.logger.Err(pathJoinError).Caller().Str("func", "*MetricsAgent.sendMetrics").Msg("url join error")
+		return fmt.Errorf("url join error: %w", pathJoinError)
+	}
+
+	// construct headers
+	headers := map[string]string{
+		"Content-Type":     "application/json",
+		"Content-Encoding": "gzip",
+	}
+
+	// include hash of the body
+	if m.hasher != nil {
+		hashedMetric, hashingError := m.hasher.HashMetrics(metric...)
+		if hashingError != nil {
+			m.logger.Err(hashingError).Caller().Str("func", "*MetricsAgent.sendMetrics").Msg("error occurred during hashing metric")
+			return hashingError
+		}
+		headers["HashSHA256"] = fmt.Sprintf("%x", hashedMetric)
+	}
+
+	// gzip encode metric
+	compressedMetric, compressionError := gzipCompress(metric...)
+	if compressionError != nil {
+		m.logger.Err(compressionError).Caller().Str("func", "*MetricsAgent.sendMetrics").Msg("error occurred during gzip compression")
+		return compressionError
+	}
+
+	m.logger.Debug().Any("metric", metric).Any("hash", headers).Msg("")
+
+	var response models.Metrics
+	_, sendMetricError := m.client.R().
+		SetHeaders(headers).
+		SetBody(compressedMetric).
+		SetResult(&response).
+		Post(route)
+	if sendMetricError != nil {
+		m.logger.Err(sendMetricError).Caller().Str("func", "*MetricsAgent.sendMetrics").Msg("error occurred during sending metric")
+		return fmt.Errorf("error occurred during sending metric: %w", sendMetricError)
+	}
+
+	m.logger.Info().Caller().Str("func", "*MetricsAgent.sendMetrics").Any("request", compressedMetric).Any("response", response).Msg("metric is sent!")
 	return nil
 }
 
@@ -191,69 +223,71 @@ func (m *MetricsAgent) SendMetrics() error {
 			return fmt.Errorf("error during metrics sending: %s", response.Status())
 		}
 	}
+
 	// after sending metrics set poll count to 0
 	m.pollCount = 0
 	return nil
 }
 
-func (m *MetricsAgent) Run() error {
-	var err error
+// ReadMetricsGenerator reads metrics and returns a channel that will feed the worker metrics for sending
+func (m *MetricsAgent) ReadMetricsGenerator(pollInterval *time.Ticker, reportInterval *time.Ticker) chan []models.Metrics {
+	metricsChannel := make(chan []models.Metrics)
 
-	utils.RunWithTicker(func() {
-		m.mu.Lock()
-		defer m.mu.Unlock()
-		err = m.ReadMetrics()
-	}, time.Duration(m.pollInterval)*time.Second)
+	go func() {
+		for {
+			select {
+			case <-pollInterval.C:
+				m.logger.Debug().Str("func", "ReadMetricsGenerator").Msg("time to READ metrics")
+				_ = m.ReadMetrics()
+			case <-reportInterval.C:
+				m.logger.Debug().Str("func", "ReadMetricsGenerator").Msg("time to SEND metrics")
+				allMetrics := m.memory.GetAllMetrics()
+				metricsChannel <- allMetrics
+			}
+		}
+	}()
 
-	utils.RunWithTicker(func() {
-		m.mu.Lock()
-		defer m.mu.Unlock()
-		err = m.SendMetricsJSON()
-	}, time.Duration(m.reportInterval)*time.Second)
-	if err != nil {
-		m.logger.Err(err).Caller().Str("func", "*MetricsAgent.Run").Msg("error occurred during running metrics-agent")
-		return err
+	return metricsChannel
+}
+
+// SendMetricsWorker this func we run in separate goroutines
+func (m *MetricsAgent) SendMetricsWorker(metricBatches <-chan []models.Metrics) {
+	for batch := range metricBatches {
+		m.logger.Debug().Any("batch", batch).Msg("worker is called")
+		_ = m.sendMetrics(batch...)
+		m.pollCount = 0
 	}
+}
+
+func (m *MetricsAgent) Run() error {
+	// reading metrics part
+	pollTicker, reportTicker := getTickers(time.Duration(m.pollInterval)*time.Second, time.Duration(m.reportInterval)*time.Second)
+	m.logger.Debug().Str("func", "Run").Msg("preparing to run goroutine for reading metrics")
+	jobs := m.ReadMetricsGenerator(pollTicker, reportTicker)
+
+	// creating workers
+	m.logger.Debug().Str("func", "Run").Msg("creating workers")
+	m.withWorkers(func() {
+		m.SendMetricsWorker(jobs)
+	}, m.rateLimit)
+	m.logger.Debug().Str("func", "Run").Msg("workers are created")
 
 	select {} // block main routine forever
 }
 
 func newHTTPClient() *resty.Client {
-	return resty.New().SetDebug(false)
+	return resty.New().SetDebug(true)
 }
 
-func (m *MetricsAgent) getSliceOfMetrics(memStats runtime.MemStats) []models.Metrics {
-	m.pollCount++
-	return []models.Metrics{
-		gaugeMetric("Alloc", float64(memStats.Alloc)),
-		gaugeMetric("BuckHashSys", float64(memStats.BuckHashSys)),
-		gaugeMetric("Frees", float64(memStats.Frees)),
-		gaugeMetric("GCCPUFraction", memStats.GCCPUFraction),
-		gaugeMetric("GCSys", float64(memStats.GCSys)),
-		gaugeMetric("HeapAlloc", float64(memStats.HeapAlloc)),
-		gaugeMetric("HeapIdle", float64(memStats.HeapIdle)),
-		gaugeMetric("HeapInuse", float64(memStats.HeapInuse)),
-		gaugeMetric("HeapObjects", float64(memStats.HeapObjects)),
-		gaugeMetric("HeapReleased", float64(memStats.HeapReleased)),
-		gaugeMetric("HeapSys", float64(memStats.HeapSys)),
-		gaugeMetric("LastGC", float64(memStats.LastGC)),
-		gaugeMetric("Lookups", float64(memStats.Lookups)),
-		gaugeMetric("MCacheInuse", float64(memStats.MCacheInuse)),
-		gaugeMetric("MCacheSys", float64(memStats.MCacheSys)),
-		gaugeMetric("MSpanInuse", float64(memStats.MSpanInuse)),
-		gaugeMetric("MSpanSys", float64(memStats.MSpanSys)),
-		gaugeMetric("Mallocs", float64(memStats.Mallocs)),
-		gaugeMetric("NextGC", float64(memStats.NextGC)),
-		gaugeMetric("NumForcedGC", float64(memStats.NumForcedGC)),
-		gaugeMetric("NumGC", float64(memStats.NumGC)),
-		gaugeMetric("OtherSys", float64(memStats.OtherSys)),
-		gaugeMetric("PauseTotalNs", float64(memStats.PauseTotalNs)),
-		gaugeMetric("StackInuse", float64(memStats.StackInuse)),
-		gaugeMetric("StackSys", float64(memStats.StackSys)),
-		gaugeMetric("Sys", float64(memStats.Sys)),
-		gaugeMetric("TotalAlloc", float64(memStats.TotalAlloc)),
-		counterMetric("PollCount", m.pollCount),
-		gaugeMetric("RandomValue", rand.Float64()),
+func getTickers(pollIntervalDuration time.Duration, reportIntervalDuration time.Duration) (*time.Ticker, *time.Ticker) {
+	return time.NewTicker(pollIntervalDuration), time.NewTicker(reportIntervalDuration)
+}
+
+func (m *MetricsAgent) withWorkers(fn func(), count int64) {
+	for i := range count {
+		m.logger.Debug().Str("func", "withWorkers").Msgf("creating worker #%d", i)
+		go fn()
+		m.logger.Debug().Msgf("worker#%d is created", i)
 	}
 }
 
@@ -283,27 +317,21 @@ func (m *MetricsAgent) getRoute(metric models.Metrics) (string, error) {
 	return "", errors.New("error occurred during route construction")
 }
 
-func gaugeMetric(name string, value float64) models.Metrics {
-	return models.Metrics{
-		ID:    name,
-		MType: models.Gauge,
-		Value: &value,
-	}
-}
+func gzipCompress(metric ...models.Metrics) ([]byte, error) {
+	var jsonData []byte
+	var err error
 
-func counterMetric(name string, value int64) models.Metrics {
-	return models.Metrics{
-		ID:    name,
-		MType: models.Counter,
-		Delta: &value,
-	}
-}
-
-func gzipCompress(metric models.Metrics) ([]byte, error) {
-	// сериализуем metric в JSON
-	jsonData, err := json.Marshal(metric)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal metric: %w", err)
+	if len(metric) == 1 {
+		jsonData, err = json.Marshal(metric[0])
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal metric: %w", err)
+		}
+	} else {
+		// сериализуем metric в JSON
+		jsonData, err = json.Marshal(metric)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal metrics: %w", err)
+		}
 	}
 
 	// создаем gzip-сжатие

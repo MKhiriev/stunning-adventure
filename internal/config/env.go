@@ -11,6 +11,8 @@ type AgentConfig struct {
 	ServerAddress  string `env:"ADDRESS"`
 	ReportInterval int64  `env:"REPORT_INTERVAL"`
 	PollInterval   int64  `env:"POLL_INTERVAL"`
+	HashKey        string `env:"KEY"`
+	RateLimit      int64  `env:"RATE_LIMIT"`
 }
 
 type ServerConfig struct {
@@ -19,6 +21,7 @@ type ServerConfig struct {
 	FileStoragePath        string `env:"FILE_STORAGE_PATH"`
 	RestoreMetricsFromFile bool   `env:"RESTORE"`
 	DatabaseDSN            string `env:"DATABASE_DSN"`
+	HashKey                string `env:"KEY"`
 }
 
 func GetAgentConfigs() *AgentConfig {
@@ -29,12 +32,12 @@ func GetAgentConfigs() *AgentConfig {
 	}
 
 	// if all values are not nil return cfg
-	if cfg.ServerAddress != "" && cfg.ReportInterval != 0 && cfg.PollInterval != 0 {
+	if cfg.ServerAddress != "" && cfg.ReportInterval != 0 && cfg.PollInterval != 0 && cfg.RateLimit != 0 {
 		return cfg
 	}
 
 	// else get command line args or default values
-	commandLineServerAddress, commandLinePollInterval, commandLineReportInterval := ParseAgentFlags()
+	commandLineServerAddress, commandLinePollInterval, commandLineReportInterval, commandLineHashKey, commandLineRateLimit := ParseAgentFlags()
 
 	if cfg.ServerAddress == "" {
 		cfg.ServerAddress = commandLineServerAddress
@@ -44,6 +47,12 @@ func GetAgentConfigs() *AgentConfig {
 	}
 	if cfg.ReportInterval == 0 {
 		cfg.ReportInterval = commandLineReportInterval
+	}
+	if cfg.HashKey == "" {
+		cfg.HashKey = commandLineHashKey
+	}
+	if cfg.RateLimit == 0 {
+		cfg.RateLimit = commandLineRateLimit
 	}
 
 	return cfg
@@ -62,7 +71,7 @@ func GetServerConfigs() (*ServerConfig, error) {
 	}
 
 	// else get command line args or default values
-	commandLineServerAddress, commandLineStoreInterval, commandLineFileStoragePath, commandLineRestore, databaseDSN := ParseServerFlags()
+	commandLineServerAddress, commandLineStoreInterval, commandLineFileStoragePath, commandLineRestore, databaseDSN, commandLineHashKey := ParseServerFlags()
 
 	if cfg.ServerAddress == "" {
 		cfg.ServerAddress = commandLineServerAddress
@@ -78,6 +87,9 @@ func GetServerConfigs() (*ServerConfig, error) {
 	}
 	if cfg.DatabaseDSN == "" {
 		cfg.DatabaseDSN = databaseDSN
+	}
+	if cfg.HashKey == "" {
+		cfg.HashKey = commandLineHashKey
 	}
 
 	return cfg, cfg.Validate()

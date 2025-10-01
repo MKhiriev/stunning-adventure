@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -140,16 +141,19 @@ func initHandler() *Handler {
 		RestoreMetricsFromFile: false,
 	}
 	memStorage := store.NewMemStorage(&logger)
-	fileStorage, _ := store.NewFileStorage(memStorage, cfg, &logger)
+	fileStorage, _ := store.NewFileStorage(context.Background(), memStorage, cfg, &logger)
 	db := store.DB{}
+
+	validationService := service.NewValidatingMetricsService(&logger)
 	metricsService, _ := service.NewMetricsServiceBuilder(cfg, &logger).
 		WithCache(memStorage).
 		WithFile(fileStorage).
 		WithDB(&db).
+		WithWrapper(validationService).
 		Build() //, &db, memStorage, cfg, &logger
 	dbPingService, _ := service.NewPingDBService(&db, &logger)
 
-	return NewHandler(metricsService, dbPingService, &logger)
+	return NewHandler(metricsService, dbPingService, cfg, &logger)
 }
 
 func mDelta(v int) *int64 {

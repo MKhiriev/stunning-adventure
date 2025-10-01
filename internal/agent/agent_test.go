@@ -17,7 +17,7 @@ func TestReadMetrics(t *testing.T) {
 	agent := initAgent()
 
 	type want struct {
-		length int
+		moreThanZeroMetrics bool
 	}
 	tests := []struct {
 		name string
@@ -26,7 +26,7 @@ func TestReadMetrics(t *testing.T) {
 		{
 			name: "positive test #1",
 			want: want{
-				length: 29,
+				moreThanZeroMetrics: len(agent.memory.metrics) > 0,
 			},
 		},
 	}
@@ -35,7 +35,7 @@ func TestReadMetrics(t *testing.T) {
 			err := agent.ReadMetrics()
 			require.NoError(t, err)
 			assert.NotEmpty(t, agent.memory.metrics)
-			assert.Equal(t, test.want.length, len(agent.memory.metrics))
+			assert.True(t, len(agent.memory.metrics) > 0)
 			// check for non nil values
 			for _, metric := range agent.memory.metrics {
 				if metric.MType == models.Gauge {

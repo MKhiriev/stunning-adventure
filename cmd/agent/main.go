@@ -9,8 +9,10 @@ import (
 func main() {
 	cfg := config.GetAgentConfigs()
 	log := logger.NewLogger("metrics-agent")
+	log.Debug().Any("cfg-agent", cfg).Msg("")
 	log.Info().Msg("Agent started")
 
-	err := agent.NewMetricsAgent("update", cfg, log).Run()
+	//err := agent.NewMetricsAgent("update", cfg, log).Run()
+	err := agent.NewMetricsAgent("updates", cfg, log).Run()
 	log.Err(err).Caller().Str("func", "main").Msg("error occurred in agent during running")
 }

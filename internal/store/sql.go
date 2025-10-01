@@ -33,8 +33,7 @@ type DB struct {
 	maxAttempts        int
 }
 
-func NewConnectPostgres(cfg *config.ServerConfig, log *zerolog.Logger) (*DB, error) {
-	ctx := context.Background()
+func NewConnectPostgres(ctx context.Context, cfg *config.ServerConfig, log *zerolog.Logger) (*DB, error) {
 	// establish connection
 	conn, err := sql.Open("pgx", cfg.DatabaseDSN)
 	if err != nil {
@@ -87,19 +86,18 @@ func (db *DB) SaveAll(ctx context.Context, metrics []models.Metrics) error {
 	return err
 }
 
-func (db *DB) Get(ctx context.Context, metric models.Metrics) (models.Metrics, bool) {
+func (db *DB) Get(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
 	var foundMetric models.Metrics
-	var found bool
 	err := db.withRetry(ctx, "*DB.Get", func() error {
 		var getErr error
 		foundMetric, getErr = db.getMetric(ctx, metric)
 		return getErr
 	})
-	if err == nil {
-		found = true
+	if err != nil {
+		return models.Metrics{}, err
 	}
 
-	return foundMetric, found
+	return foundMetric, nil
 }
 
 func (db *DB) GetAll(ctx context.Context) ([]models.Metrics, error) {
@@ -228,7 +226,7 @@ func (db *DB) getMetric(ctx context.Context, metric models.Metrics) (models.Metr
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		db.logger.Err(err).Str("func", "*DB.getMetric").Msg("no rows were found")
-		return models.Metrics{}, err
+		return models.Metrics{}, ErrNotFound
 	case err != nil:
 		db.logger.Err(err).Str("func", "*DB.getMetric").Msg("error occurred during scanning")
 		return models.Metrics{}, err

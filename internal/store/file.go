@@ -19,7 +19,7 @@ type FileStorage struct {
 	fullFileName string
 }
 
-func NewFileStorage(memStorage *MemStorage, cfg *config.ServerConfig, log *zerolog.Logger) (*FileStorage, error) {
+func NewFileStorage(ctx context.Context, memStorage *MemStorage, cfg *config.ServerConfig, log *zerolog.Logger) (*FileStorage, error) {
 	if cfg.FileStoragePath == "" {
 		log.Error().Msg("no file storage path was provided")
 		return nil, errors.New("no file storage path was provided")
@@ -40,11 +40,12 @@ func NewFileStorage(memStorage *MemStorage, cfg *config.ServerConfig, log *zerol
 
 	// load metrics from file if needed
 	if cfg.RestoreMetricsFromFile {
-		metricsFromFile, err := fs.LoadMetricsFromFile(context.TODO())
+		metricsFromFile, err := fs.LoadMetricsFromFile(ctx)
 		if err != nil {
 			fs.log.Err(err).Str("func", "store.NewFileStorage").Msg("error loading metrics from file")
 			return nil, err
 		}
+		fs.log.Debug().Str("func", "store.NewFileStorage").Any("metrics", metricsFromFile).Msg("restored metrics from file")
 		for _, metric := range metricsFromFile {
 			fs.memStorage.Memory[metric.ID] = metric
 		}
@@ -125,24 +126,25 @@ func (fs *FileStorage) Save(ctx context.Context, metric models.Metrics) (models.
 }
 
 func (fs *FileStorage) SaveAll(ctx context.Context, metrics []models.Metrics) error {
+	fs.log.Debug().Str("func", "*FileStorage.SaveAll").Any("metrics", metrics).Msg("trying to save all metrics")
 	return fs.SaveMetricsToFile(ctx, metrics)
 }
 
-func (fs *FileStorage) Get(ctx context.Context, metric models.Metrics) (models.Metrics, bool) {
+func (fs *FileStorage) Get(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
 	metrics, err := fs.LoadMetricsFromFile(ctx)
 	if err != nil {
 		fs.log.Err(err).Str("func", "*FileStorage.Get").Msg("error during getting metric from file")
-		return models.Metrics{}, false
+		return models.Metrics{}, err
 	}
 
 	for _, m := range metrics {
 		if m.ID == metric.ID && m.MType == metric.MType {
-			return m, true
+			return m, nil
 		}
 	}
 
 	fs.log.Info().Str("func", "*FileStorage.Get").Msg("no metric was found")
-	return models.Metrics{}, false
+	return models.Metrics{}, ErrNotFound
 }
 
 func (fs *FileStorage) GetAll(ctx context.Context) ([]models.Metrics, error) {

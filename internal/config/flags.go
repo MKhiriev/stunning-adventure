@@ -16,6 +16,8 @@ const (
 	defaultFileStoragePath = ""
 	defaultRestoreValue    = false
 	defaultDatabaseDSN     = ""
+	defaultHashKey         = ""
+	defaultRateLimit       = int64(1)
 )
 
 type NetAddress struct {
@@ -23,7 +25,7 @@ type NetAddress struct {
 	Port int
 }
 
-func ParseServerFlags() (netAddress string, storeInterval int64, fileStoragePath string, restore bool, databaseDSN string) {
+func ParseServerFlags() (netAddress string, storeInterval int64, fileStoragePath string, restore bool, databaseDSN string, hashKey string) {
 	serverAddress := NetAddress{}
 	_ = flag.Value(&serverAddress)
 
@@ -32,23 +34,26 @@ func ParseServerFlags() (netAddress string, storeInterval int64, fileStoragePath
 	flag.StringVar(&fileStoragePath, "f", defaultFileStoragePath, "Storage file path string")
 	flag.BoolVar(&restore, "r", defaultRestoreValue, "Boolean - restore previous metrics from file")
 	flag.StringVar(&databaseDSN, "d", defaultDatabaseDSN, "Postgres database connection string")
+	flag.StringVar(&hashKey, "k", defaultHashKey, "Hash key for hashing")
 
 	flag.Parse()
 
-	return serverAddress.String(), storeInterval, fileStoragePath, restore, databaseDSN
+	return serverAddress.String(), storeInterval, fileStoragePath, restore, databaseDSN, hashKey
 }
 
-func ParseAgentFlags() (netAddress string, pollInterval int64, reportInterval int64) {
+func ParseAgentFlags() (netAddress string, pollInterval int64, reportInterval int64, hashKey string, rateLimit int64) {
 	serverAddress := NetAddress{}
 	_ = flag.Value(&serverAddress)
 
 	flag.Var(&serverAddress, "a", "Net address host:port")
 	flag.Int64Var(&pollInterval, "p", defaultPollInterval, "Poll interval in seconds")
 	flag.Int64Var(&reportInterval, "r", defaultReportInterval, "Report interval in seconds")
+	flag.StringVar(&hashKey, "k", defaultHashKey, "Hash key for hashing")
+	flag.Int64Var(&rateLimit, "l", defaultRateLimit, "Concurrent request limit to the server")
 
 	flag.Parse()
 
-	return serverAddress.String(), pollInterval, reportInterval
+	return serverAddress.String(), pollInterval, reportInterval, hashKey, rateLimit
 }
 
 func (a *NetAddress) String() string {

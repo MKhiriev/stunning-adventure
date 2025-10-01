@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+
 	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/internal/handlers"
 	"github.com/MKhiriev/stunning-adventure/internal/logger"
@@ -10,6 +12,7 @@ import (
 )
 
 func main() {
+	ctx := context.Background()
 	log := logger.NewLogger("metrics-server")
 	cfg, err := config.GetServerConfigs()
 	if err != nil {
@@ -19,19 +22,21 @@ func main() {
 	log.Info().Any("cfg-srv", cfg).Msg("Server started")
 
 	memStorage := store.NewMemStorage(log)
-	conn, err := store.NewConnectPostgres(cfg, log)
+	conn, err := store.NewConnectPostgres(ctx, cfg, log)
 	if err != nil {
 		log.Err(err).Msg("connection to database failed")
 	}
-	fileStorage, err := store.NewFileStorage(memStorage, cfg, log)
+	fileStorage, err := store.NewFileStorage(ctx, memStorage, cfg, log)
 	if err != nil {
 		log.Err(err).Msg("file storage creation failed")
 	}
 
+	metricsValidationService := service.NewValidatingMetricsService(log)
 	metricsService, err := service.NewMetricsServiceBuilder(cfg, log).
 		WithDB(conn).
 		WithFile(fileStorage).
 		WithCache(memStorage).
+		WithWrapper(metricsValidationService).
 		Build()
 	if err != nil {
 		log.Err(err).Msg("creation of metrics service failed")
@@ -43,7 +48,7 @@ func main() {
 		return
 	}
 
-	handler := handlers.NewHandler(metricsService, pingService, log)
+	handler := handlers.NewHandler(metricsService, pingService, cfg, log)
 	myServer := new(server.Server)
 	myServer.ServerRun(handler.Init(), cfg)
 }
