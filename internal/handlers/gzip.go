@@ -8,15 +8,12 @@ import (
 
 func GZip(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		// Проверяем, поддерживает ли клиент gzip сжатие для ответов
 		acceptEncoding := req.Header.Get("Accept-Encoding")
 		supportsGzip := strings.Contains(acceptEncoding, "gzip")
 
-		// Проверяем, отправил ли клиент сжатые данные в запросе
 		contentEncoding := req.Header.Get("Content-Encoding")
 		isGzipRequest := strings.Contains(contentEncoding, "gzip")
 
-		// Обрабатываем входящий сжатый запрос
 		if isGzipRequest && req.Body != nil {
 			gzipReader, err := gzip.NewReader(req.Body)
 			if err != nil {
@@ -29,7 +26,6 @@ func GZip(next http.Handler) http.Handler {
 			req.Header.Del("Content-Encoding")
 		}
 
-		// Обрабатываем исходящий ответ - сжимаем если клиент поддерживает
 		if supportsGzip {
 			gzipWriter := gzip.NewWriter(w)
 			defer gzipWriter.Close()
