@@ -19,7 +19,8 @@ func main() {
 		log.Err(err).Msg("invalid server configuration was passed")
 		return
 	}
-	log.Info().Any("cfg-srv", cfg).Msg("Server started")
+	log.Debug().Any("cfg-srv", cfg).Send()
+	log.Info().Msg("Server started")
 
 	memStorage := store.NewMemStorage(log)
 	conn, err := store.NewConnectPostgres(ctx, cfg, log)

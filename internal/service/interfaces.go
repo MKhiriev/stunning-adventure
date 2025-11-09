@@ -20,3 +20,7 @@ type PingService interface {
 type MetricsServiceWrapper interface {
 	Wrap(MetricsService) MetricsService
 }
+
+type AuditService interface {
+	SendAudit(event models.AuditEvent) error
+}

@@ -276,7 +276,7 @@ func (m *MetricsAgent) Run() error {
 }
 
 func newHTTPClient() *resty.Client {
-	return resty.New().SetDebug(true)
+	return resty.New().SetDebug(false)
 }
 
 func getTickers(pollIntervalDuration time.Duration, reportIntervalDuration time.Duration) (*time.Ticker, *time.Ticker) {

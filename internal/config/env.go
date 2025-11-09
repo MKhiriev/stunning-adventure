@@ -22,6 +22,9 @@ type ServerConfig struct {
 	RestoreMetricsFromFile bool   `env:"RESTORE"`
 	DatabaseDSN            string `env:"DATABASE_DSN"`
 	HashKey                string `env:"KEY"`
+
+	AuditFile string `env:"AUDIT_FILE"`
+	AuditURL  string `env:"AUDIT_URL"`
 }
 
 func GetAgentConfigs() *AgentConfig {
@@ -71,7 +74,9 @@ func GetServerConfigs() (*ServerConfig, error) {
 	}
 
 	// else get command line args or default values
-	commandLineServerAddress, commandLineStoreInterval, commandLineFileStoragePath, commandLineRestore, databaseDSN, commandLineHashKey := ParseServerFlags()
+	commandLineServerAddress, commandLineStoreInterval, commandLineFileStoragePath,
+		commandLineRestore, databaseDSN, commandLineHashKey,
+		commandLineAuditFilePath, commandLineAuditURL := ParseServerFlags()
 
 	if cfg.ServerAddress == "" {
 		cfg.ServerAddress = commandLineServerAddress
@@ -90,6 +95,12 @@ func GetServerConfigs() (*ServerConfig, error) {
 	}
 	if cfg.HashKey == "" {
 		cfg.HashKey = commandLineHashKey
+	}
+	if cfg.AuditFile == "" {
+		cfg.AuditFile = commandLineAuditFilePath
+	}
+	if cfg.AuditURL == "" {
+		cfg.AuditURL = commandLineAuditURL
 	}
 
 	return cfg, cfg.Validate()

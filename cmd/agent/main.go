@@ -9,7 +9,7 @@ import (
 func main() {
 	cfg := config.GetAgentConfigs()
 	log := logger.NewLogger("metrics-agent")
-	log.Debug().Any("cfg-agent", cfg).Msg("")
+	log.Debug().Any("cfg-agent", cfg).Send()
 	log.Info().Msg("Agent started")
 
 	err := agent.NewMetricsAgent("updates", cfg, log).Run()

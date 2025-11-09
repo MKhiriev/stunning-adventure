@@ -18,6 +18,8 @@ const (
 	defaultDatabaseDSN     = ""
 	defaultHashKey         = ""
 	defaultRateLimit       = int64(1)
+	defaultAuditFilePath   = ""
+	defaultAuditURL        = ""
 )
 
 type NetAddress struct {
@@ -25,7 +27,7 @@ type NetAddress struct {
 	Port int
 }
 
-func ParseServerFlags() (netAddress string, storeInterval int64, fileStoragePath string, restore bool, databaseDSN string, hashKey string) {
+func ParseServerFlags() (netAddress string, storeInterval int64, fileStoragePath string, restore bool, databaseDSN string, hashKey string, auditFilePath string, auditURL string) {
 	serverAddress := NetAddress{}
 	_ = flag.Value(&serverAddress)
 
@@ -36,9 +38,12 @@ func ParseServerFlags() (netAddress string, storeInterval int64, fileStoragePath
 	flag.StringVar(&databaseDSN, "d", defaultDatabaseDSN, "Postgres database connection string")
 	flag.StringVar(&hashKey, "k", defaultHashKey, "Hash key for hashing")
 
+	flag.StringVar(&auditFilePath, "audit-file", defaultAuditFilePath, "Audit file path string")
+	flag.StringVar(&auditURL, "audit-url", defaultAuditURL, "Full Audit URL string")
+
 	flag.Parse()
 
-	return serverAddress.String(), storeInterval, fileStoragePath, restore, databaseDSN, hashKey
+	return serverAddress.String(), storeInterval, fileStoragePath, restore, databaseDSN, hashKey, auditFilePath, auditURL
 }
 
 func ParseAgentFlags() (netAddress string, pollInterval int64, reportInterval int64, hashKey string, rateLimit int64) {

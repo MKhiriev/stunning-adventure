@@ -10,9 +10,11 @@ import (
 )
 
 type Handler struct {
-	logger          *zerolog.Logger
-	metricsService  service.MetricsService
-	dbPingService   service.PingService
+	logger         *zerolog.Logger
+	metricsService service.MetricsService
+	dbPingService  service.PingService
+	auditService   service.AuditService
+
 	metricValidator validators.Validator
 	hashKey         string
 }
@@ -29,20 +31,23 @@ func NewHandler(metricsService service.MetricsService, dbPingService service.Pin
 
 func (h *Handler) Init() *chi.Mux {
 	router := chi.NewRouter()
-	router.Use(middleware.Recoverer, h.WithLogging, WithContext)
+	router.Use(middleware.Recoverer, WithContext, GZip, h.WithLogging, h.WithHashing)
+
+	// metrics handlers group
 	router.Group(func(r chi.Router) {
-		r.Use(GZip, h.WithHashing)
-		r.Post("/updates/", h.BatchUpdateMetricJSON)
-		r.Post("/update/", h.UpdateMetricJSON)
 		r.Post("/value/", h.GetMetricJSON)
 		r.Get("/", h.GetAllMetrics)
-	})
-
-	router.Group(func(r chi.Router) {
-		r.Post("/update/{metricType}/{metricName}/{metricValue}", h.MetricHandler)
 		r.Get("/value/{metricType}/{metricName}", h.GetMetricValue)
+
+		r.Group(func(audit chi.Router) {
+			audit.Use(h.Audit)
+			audit.Post("/updates/", h.BatchUpdateMetricJSON)
+			audit.Post("/update/", h.UpdateMetricJSON)
+			audit.Post("/update/{metricType}/{metricName}/{metricValue}", h.MetricHandler)
+		})
 	})
 
+	// database ping group
 	router.Group(func(r chi.Router) {
 		r.Use(h.DatabaseConnectionCheck)
 		r.Get("/ping", h.Ping)

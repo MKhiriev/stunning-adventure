@@ -249,12 +249,3 @@ func (h *Handler) getValueFromMetric(metric models.Metrics) string {
 	}
 	return ""
 }
-
-func (h *Handler) checkValue(cond bool, ifNotEmptyError error) error {
-	if !cond {
-		h.logger.Error().Str("func", "*Handler.checkValue").Msg("value is not valid")
-		return ifNotEmptyError
-	}
-
-	return nil
-}
