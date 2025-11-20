@@ -12,6 +12,10 @@ type auditAdapter struct {
 }
 
 func NewAuditAdapter(remoteServer string) AuditEventAdapter {
+	if remoteServer == "" {
+		return nil
+	}
+
 	// TODO create http client and static request with replaceable body
 
 	return &auditAdapter{
