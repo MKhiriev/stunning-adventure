@@ -12,6 +12,6 @@ func NewAdapters(remoteServer string, logger *zerolog.Logger) *Adapters {
 	defer logger.Info().Msg("adapters are initialized")
 
 	return &Adapters{
-		AuditEventAdapter: NewAuditAdapter(remoteServer),
+		AuditEventAdapter: NewAuditAdapter(remoteServer, logger),
 	}
 }

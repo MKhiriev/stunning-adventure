@@ -9,7 +9,6 @@ type Observers struct {
 	RemoteServerObserver AuditObserver
 }
 
-// DONE!
 func NewObservers(filePath string, adapter adapters.AuditEventAdapter) Observers {
 	observers := Observers{}
 
