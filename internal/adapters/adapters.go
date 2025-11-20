@@ -5,13 +5,13 @@ import (
 )
 
 type Adapters struct {
-	AuditAdapter
+	AuditEventAdapter AuditEventAdapter
 }
 
-func NewAdapters(logger *zerolog.Logger) *Adapters {
+func NewAdapters(remoteServer string, logger *zerolog.Logger) *Adapters {
 	defer logger.Info().Msg("adapters are initialized")
 
 	return &Adapters{
-		AuditAdapter: NewAuditAdapter(),
+		AuditEventAdapter: NewAuditAdapter(remoteServer),
 	}
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 
+	"github.com/MKhiriev/stunning-adventure/internal/adapters"
 	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/internal/handlers"
 	"github.com/MKhiriev/stunning-adventure/internal/logger"
@@ -21,6 +22,8 @@ func main() {
 	}
 	log.Debug().Any("cfg-srv", cfg).Send()
 	log.Info().Msg("Server started")
+
+	allAdapters := adapters.NewAdapters(cfg.AuditURL, log)
 
 	memStorage := store.NewMemStorage(log)
 	conn, err := store.NewConnectPostgres(ctx, cfg, log)
@@ -48,8 +51,9 @@ func main() {
 		log.Err(err).Msg("creation of ping db service failed")
 		return
 	}
+	auditService := service.NewAuditService(cfg.AuditFile, allAdapters.AuditEventAdapter, log)
 
-	handler := handlers.NewHandler(metricsService, pingService, cfg, log)
+	handler := handlers.NewHandler(metricsService, pingService, auditService, cfg, log)
 	myServer := new(server.Server)
 	myServer.ServerRun(handler.Init(), cfg)
 }

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -22,13 +23,13 @@ func (h *Handler) Audit(next http.Handler) http.Handler {
 		// get request body - request.Clone() doesn't clone body
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			h.logger.Err(err).Str("func", "*Handler.Audit").Msg("failed to read request body")
+			h.logger.Err(err).Str("func", "*Handler.SendEvent").Msg("failed to read request body")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		r.Body = io.NopCloser(bytes.NewReader(body))
 
-		h.logger.Debug().Str("func", "*Handler.Audit").
+		h.logger.Debug().Str("func", "*Handler.SendEvent").
 			Any("body", body).
 			Any("url", r.URL).
 			Bool("is read body nil?", body == nil).
@@ -37,8 +38,11 @@ func (h *Handler) Audit(next http.Handler) http.Handler {
 
 		next.ServeHTTP(aw, r)
 
+		ctx, cancelFunc := context.WithTimeout(r.Context(), timeout)
+		defer cancelFunc()
+
 		if aw.responseData.status != http.StatusOK {
-			h.logger.Debug().Str("func", "*Handler.Audit").
+			h.logger.Debug().Str("func", "*Handler.SendEvent").
 				Int("status", aw.responseData.status).
 				Msg("not sending audit report")
 			return
@@ -53,7 +57,7 @@ func (h *Handler) Audit(next http.Handler) http.Handler {
 			metricName := chi.URLParam(r, "metricName")
 			auditEvent, err = models.NewAuditEvent(ipAddress, ts, metricName)
 			if err != nil {
-				h.logger.Err(err).Str("func", "*Handler.Audit").
+				h.logger.Err(err).Str("func", "*Handler.SendEvent").
 					Str("source", "url param").
 					Str("metric name", metricName).
 					Msg("cannot create audit event")
@@ -62,13 +66,13 @@ func (h *Handler) Audit(next http.Handler) http.Handler {
 		} else {
 			metricsFromBody, err := getMetricsFromBody(body)
 			if err != nil {
-				h.logger.Err(err).Str("func", "*Handler.Audit").Msg("error extracting metrics from body")
+				h.logger.Err(err).Str("func", "*Handler.SendEvent").Msg("error extracting metrics from body")
 				return
 			}
 			metricNames := getListOfMetricsNames(metricsFromBody)
 			auditEvent, err = models.NewAuditEvent(ipAddress, ts, metricNames...)
 			if err != nil {
-				h.logger.Err(err).Str("func", "*Handler.Audit").
+				h.logger.Err(err).Str("func", "*Handler.SendEvent").
 					Str("source", "request body").
 					Strs("metric name", metricNames).
 					Msg("cannot create audit event")
@@ -77,13 +81,13 @@ func (h *Handler) Audit(next http.Handler) http.Handler {
 		}
 
 		// send audit event
-		err = h.auditService.SendAudit(auditEvent)
+		err = h.auditService.NotifyAll(ctx, auditEvent)
 		if err != nil {
 			h.logger.Err(err).Any("audit event", auditEvent).Msg("error sending audit event")
 			return
 		}
 
-		h.logger.Debug().Str("func", "*Handler.Audit").Any("audit event", auditEvent).Msg("audit is sent")
+		h.logger.Debug().Str("func", "*Handler.SendEvent").Any("audit event", auditEvent).Msg("event is sent")
 	})
 }
 

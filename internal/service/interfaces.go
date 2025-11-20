@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	"github.com/MKhiriev/stunning-adventure/internal/service/observer"
 	"github.com/MKhiriev/stunning-adventure/models"
 )
 
@@ -21,6 +22,8 @@ type MetricsServiceWrapper interface {
 	Wrap(MetricsService) MetricsService
 }
 
-type AuditService interface {
-	SendAudit(event models.AuditEvent) error
+type AuditPublisher interface {
+	Register(observer observer.AuditObserver) error
+	Deregister(observer observer.AuditObserver) error
+	NotifyAll(ctx context.Context, event models.AuditEvent) error
 }

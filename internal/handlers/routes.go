@@ -13,17 +13,19 @@ type Handler struct {
 	logger         *zerolog.Logger
 	metricsService service.MetricsService
 	dbPingService  service.PingService
-	auditService   service.AuditService
+	auditService   service.AuditPublisher
 
 	metricValidator validators.Validator
 	hashKey         string
 }
 
-func NewHandler(metricsService service.MetricsService, dbPingService service.PingService, cfg *config.ServerConfig, logger *zerolog.Logger) *Handler {
+func NewHandler(metricsService service.MetricsService, dbPingService service.PingService, auditService service.AuditPublisher, cfg *config.ServerConfig, logger *zerolog.Logger) *Handler {
 	return &Handler{
-		logger:          logger,
-		metricsService:  metricsService,
-		dbPingService:   dbPingService,
+		logger:         logger,
+		metricsService: metricsService,
+		dbPingService:  dbPingService,
+		auditService:   auditService,
+
 		metricValidator: validators.NewMetricsValidator(),
 		hashKey:         cfg.HashKey,
 	}

@@ -1,7 +1,11 @@
 package adapters
 
-import "context"
+import (
+	"context"
 
-type AuditAdapter interface {
-	Audit(ctx context.Context) error
+	"github.com/MKhiriev/stunning-adventure/models"
+)
+
+type AuditEventAdapter interface {
+	SendEvent(ctx context.Context, event models.AuditEvent) error
 }
