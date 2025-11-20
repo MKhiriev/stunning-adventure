@@ -14,24 +14,24 @@ import (
 // this service is publisher (probably)
 type auditService struct {
 	observers map[string]observer.AuditObserver
-	log       *zerolog.Logger
+	logger    *zerolog.Logger
 }
 
-func NewAuditService(filePath string, adapter adapters.AuditEventAdapter, log *zerolog.Logger) AuditPublisher {
+func NewAuditService(filePath string, adapter adapters.AuditEventAdapter, logger *zerolog.Logger) AuditPublisher {
 	service := &auditService{
 		observers: make(map[string]observer.AuditObserver),
-		log:       log,
+		logger:    logger,
 	}
 
-	observers := observer.NewObservers(filePath, adapter)
+	observers := observer.NewObservers(filePath, adapter, logger)
 
 	if err := service.Register(observers.FileObserver); err != nil {
-		service.log.Err(err).Str("func", "service.NewAuditService").
+		service.logger.Err(err).Str("func", "service.NewAuditService").
 			Msg("file observer was not created")
 	}
 
 	if err := service.Register(observers.RemoteServerObserver); err != nil {
-		service.log.Err(err).Str("func", "service.NewAuditService").
+		service.logger.Err(err).Str("func", "service.NewAuditService").
 			Msg("remote server observer was not created")
 	}
 
@@ -39,13 +39,13 @@ func NewAuditService(filePath string, adapter adapters.AuditEventAdapter, log *z
 }
 
 func (a *auditService) NotifyAll(ctx context.Context, event models.AuditEvent) error {
-	var errs []error
+	var errs []error // = make([]error, len(a.observers))
 
 	for _, auditObserver := range a.observers {
 		err := auditObserver.Update(ctx, event)
 		if err != nil {
 			errs = append(errs, err)
-			a.log.Err(err).
+			a.logger.Err(err).
 				Str("func", "*auditService.NotifyAll").
 				Str("auditObserver", auditObserver.Name()).
 				Msg("error occurred updating")
@@ -61,11 +61,11 @@ func (a *auditService) NotifyAll(ctx context.Context, event models.AuditEvent) e
 
 func (a *auditService) Register(observer observer.AuditObserver) error {
 	if observer == nil {
-		a.log.Error().Str("func", "*auditService.Register").Msg("nil observer was passed")
+		a.logger.Error().Str("func", "*auditService.Register").Msg("nil observer was passed")
 		return errors.New("cannot register nil observer")
 	}
 
-	a.log.Info().Str("func", "*auditService.Register").
+	a.logger.Info().Str("func", "*auditService.Register").
 		Str("observer", observer.Name()).Msg("observer registered")
 	a.observers[observer.Name()] = observer
 
@@ -74,13 +74,13 @@ func (a *auditService) Register(observer observer.AuditObserver) error {
 
 func (a *auditService) Deregister(observer observer.AuditObserver) error {
 	if observer == nil {
-		a.log.Error().Str("func", "*auditService.Register").Msg("nil observer was passed")
+		a.logger.Error().Str("func", "*auditService.Register").Msg("nil observer was passed")
 		return errors.New("cannot register nil observer")
 	}
 
 	// check if observer was registered
 	if _, ok := a.observers[observer.Name()]; ok {
-		a.log.Info().Str("func", "*auditService.Register").Msg("nil observer was passed")
+		a.logger.Info().Str("func", "*auditService.Register").Msg("nil observer was passed")
 
 		// if was registered before
 		delete(a.observers, observer.Name())

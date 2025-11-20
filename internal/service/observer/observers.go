@@ -2,6 +2,7 @@ package observer
 
 import (
 	"github.com/MKhiriev/stunning-adventure/internal/adapters"
+	"github.com/rs/zerolog"
 )
 
 type Observers struct {
@@ -9,11 +10,11 @@ type Observers struct {
 	RemoteServerObserver AuditObserver
 }
 
-func NewObservers(filePath string, adapter adapters.AuditEventAdapter) Observers {
+func NewObservers(filePath string, adapter adapters.AuditEventAdapter, logger *zerolog.Logger) Observers {
 	observers := Observers{}
 
 	if filePath != "" {
-		observers.FileObserver = NewFileObserver(filePath)
+		observers.FileObserver = NewFileObserver(filePath, logger)
 	}
 
 	if adapter != nil {

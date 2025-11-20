@@ -17,8 +17,7 @@ func NewRemoteServerObserver(adapter adapters.AuditEventAdapter) AuditObserver {
 }
 
 func (r *RemoteServerObserver) Update(ctx context.Context, event models.AuditEvent) error {
-	//TODO implement me
-	panic("implement me")
+	return r.auditAdapter.SendEvent(ctx, event)
 }
 
 func (r *RemoteServerObserver) Name() string {

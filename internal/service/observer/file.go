@@ -2,29 +2,41 @@ package observer
 
 import (
 	"context"
-	"os"
+	"encoding/json"
 
+	"github.com/MKhiriev/stunning-adventure/internal/utils"
 	"github.com/MKhiriev/stunning-adventure/models"
+	"github.com/rs/zerolog"
 )
 
 type FileObserver struct {
-	file        *os.File
+	filePath    string
 	description string
+	logger      *zerolog.Logger
 }
 
-// TODO
-func NewFileObserver(filePath string) AuditObserver {
-	// todo add check if file exists, if not - create one
-	return &FileObserver{file: nil, description: "file observer"}
+func NewFileObserver(filePath string, logger *zerolog.Logger) AuditObserver {
+	if err := utils.CreateFile(filePath); err != nil {
+		logger.Err(err).
+			Str("func", "observer.NewFileObserver").
+			Msg("error during creating observers' file")
+		return nil
+	}
+
+	return &FileObserver{filePath: filePath, description: "file observer"}
 }
 
-// TODO
 func (f *FileObserver) Update(ctx context.Context, event models.AuditEvent) error {
-	//TODO implement me
-	panic("implement me")
+	eventJSON, err := json.Marshal(event)
+	if err != nil {
+		f.logger.Err(err).Str("func", "observer.NewFileObserver").
+			Msg("event to JSON conversion error")
+		return err
+	}
+
+	return utils.AppendToFile(f.filePath, eventJSON)
 }
 
-// DONE!
 func (f *FileObserver) Name() string {
 	return f.description
 }
