@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"time"
 
@@ -50,7 +51,13 @@ func (h *Handler) Audit(next http.Handler) http.Handler {
 
 		var auditEvent models.AuditEvent
 		ts := time.Now()
-		ipAddress := r.RemoteAddr
+		ipAddress, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			h.logger.Err(err).Str("func", "*Handler.SendEvent").
+				Str("reason", "cannot get source ip address").
+				Msg("error creating audit event")
+			return
+		}
 
 		// get metric names
 		if len(body) == 0 {
