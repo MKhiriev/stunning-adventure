@@ -33,10 +33,14 @@ func NewHandler(metricsService service.MetricsService, dbPingService service.Pin
 
 func (h *Handler) Init() *chi.Mux {
 	router := chi.NewRouter()
-	router.Use(middleware.Recoverer, WithContext, GZip, h.WithLogging, h.WithHashing)
+	router.Use(middleware.Recoverer, h.WithLogging, WithContext)
+
+	router.Mount("/debug", middleware.Profiler())
 
 	// metrics handlers group
 	router.Group(func(r chi.Router) {
+		r.Use(GZip, h.WithHashing)
+
 		r.Post("/value/", h.GetMetricJSON)
 		r.Get("/", h.GetAllMetrics)
 		r.Get("/value/{metricType}/{metricName}", h.GetMetricValue)
