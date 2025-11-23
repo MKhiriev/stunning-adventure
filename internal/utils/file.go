@@ -16,7 +16,7 @@ func CreateFile(filePath string) error {
 		return fmt.Errorf("error creating directory for file: %w", err)
 	}
 
-	if _, err := os.Create(filePath); err != nil {
+	if _, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0755); err != nil {
 		return fmt.Errorf("error creating file: %w", err)
 	}
 
@@ -28,7 +28,7 @@ func AppendToFile(filePath string, data []byte) error {
 	if err != nil {
 		return err
 	}
-	_, err = f.Write(data)
+	_, err = fmt.Fprintf(f, "%s\n", data)
 	if err1 := f.Close(); err1 != nil && err == nil {
 		err = err1
 	}

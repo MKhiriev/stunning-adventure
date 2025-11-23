@@ -21,7 +21,7 @@ type FileStorage struct {
 
 func NewFileStorage(ctx context.Context, memStorage *MemStorage, cfg *config.ServerConfig, log *zerolog.Logger) (*FileStorage, error) {
 	if cfg.FileStoragePath == "" {
-		log.Error().Msg("no file storage path was provided")
+		log.Error().Str("func", "store.NewFileStorage").Msg("no file storage path was provided")
 		return nil, errors.New("no file storage path was provided")
 	}
 
