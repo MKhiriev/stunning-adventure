@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/MKhiriev/stunning-adventure/internal/adapters"
 	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/internal/service"
 	"github.com/MKhiriev/stunning-adventure/internal/store"
@@ -143,6 +144,7 @@ func initHandler() *Handler {
 	memStorage := store.NewMemStorage(&logger)
 	fileStorage, _ := store.NewFileStorage(context.Background(), memStorage, cfg, &logger)
 	db := store.DB{}
+	allAdapters := adapters.NewAdapters(cfg.AuditURL, &logger)
 
 	validationService := service.NewValidatingMetricsService(&logger)
 	metricsService, _ := service.NewMetricsServiceBuilder(cfg, &logger).
@@ -153,7 +155,9 @@ func initHandler() *Handler {
 		Build() //, &db, memStorage, cfg, &logger
 	dbPingService, _ := service.NewPingDBService(&db, &logger)
 
-	return NewHandler(metricsService, dbPingService, cfg, &logger)
+	auditService := service.NewAuditService(cfg.AuditFile, allAdapters.AuditEventAdapter, &logger)
+
+	return NewHandler(metricsService, dbPingService, auditService, cfg, &logger)
 }
 
 func mDelta(v int) *int64 {
