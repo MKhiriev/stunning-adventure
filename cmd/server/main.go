@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	_ "net/http/pprof"
 
 	"github.com/MKhiriev/stunning-adventure/internal/adapters"
 	"github.com/MKhiriev/stunning-adventure/internal/config"
