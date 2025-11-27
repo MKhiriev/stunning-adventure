@@ -18,33 +18,26 @@ func (h *Handler) Audit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		aw := &AuditResponseWriter{
 			ResponseWriter: w,
-			responseData:   responseData{},
 		}
 
-		// get request body - request.Clone() doesn't clone body
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			h.logger.Err(err).Str("func", "*Handler.SendEvent").Msg("failed to read request body")
-			w.WriteHeader(http.StatusInternalServerError)
-			return
+		var body []byte
+		if r.Body != nil {
+			// get request body - request.Clone() doesn't clone body
+			var err error
+			body, err = io.ReadAll(r.Body)
+			if err != nil {
+				h.logger.Err(err).Str("func", "*Handler.SendEvent").Msg("failed to read request body")
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			r.Body = io.NopCloser(bytes.NewReader(body))
 		}
-		r.Body = io.NopCloser(bytes.NewReader(body))
-
-		h.logger.Debug().Str("func", "*Handler.SendEvent").
-			Any("body", body).
-			Any("url", r.URL).
-			Bool("is read body nil?", body == nil).
-			Bool("is read body empty byte slice?", len(body) == 0).
-			Bool("is r.Body nil?", r.Body == nil).Send()
 
 		next.ServeHTTP(aw, r)
 
-		ctx, cancelFunc := context.WithTimeout(r.Context(), timeout)
-		defer cancelFunc()
-
-		if aw.responseData.status != http.StatusOK {
+		if aw.status != http.StatusOK {
 			h.logger.Debug().Str("func", "*Handler.SendEvent").
-				Int("status", aw.responseData.status).
+				Int("status", aw.status).
 				Msg("not sending audit report")
 			return
 		}
@@ -59,18 +52,8 @@ func (h *Handler) Audit(next http.Handler) http.Handler {
 			return
 		}
 
-		// get metric names
-		if len(body) == 0 {
-			metricName := chi.URLParam(r, "metricName")
-			auditEvent, err = models.NewAuditEvent(ipAddress, ts, metricName)
-			if err != nil {
-				h.logger.Err(err).Str("func", "*Handler.SendEvent").
-					Str("source", "url param").
-					Str("metric name", metricName).
-					Msg("cannot create audit event")
-				return
-			}
-		} else {
+		// if metrics were in http-body
+		if len(body) != 0 {
 			metricsFromBody, err := getMetricsFromBody(body)
 			if err != nil {
 				h.logger.Err(err).Str("func", "*Handler.SendEvent").Msg("error extracting metrics from body")
@@ -85,16 +68,28 @@ func (h *Handler) Audit(next http.Handler) http.Handler {
 					Msg("cannot create audit event")
 				return
 			}
+		} else { // if metric were from url
+			metricName := chi.URLParam(r, "metricName")
+			auditEvent, err = models.NewAuditEvent(ipAddress, ts, metricName)
+			if err != nil {
+				h.logger.Err(err).Str("func", "*Handler.SendEvent").
+					Str("source", "url param").
+					Str("metric name", metricName).
+					Msg("cannot create audit event")
+				return
+			}
 		}
 
 		// send audit event
-		err = h.auditService.NotifyAll(ctx, auditEvent)
-		if err != nil {
-			h.logger.Err(err).Any("audit event", auditEvent).Msg("error sending audit event")
-			return
-		}
+		go func() {
+			err = h.auditService.NotifyAll(context.Background(), auditEvent)
+			if err != nil {
+				h.logger.Err(err).Any("audit event", auditEvent).Msg("error sending audit event")
+				return
+			}
 
-		h.logger.Debug().Str("func", "*Handler.SendEvent").Any("audit event", auditEvent).Msg("event is sent")
+			h.logger.Debug().Str("func", "*Handler.SendEvent").Any("audit event", auditEvent).Msg("event is sent to all recipients")
+		}()
 	})
 }
 
@@ -109,7 +104,7 @@ func getMetricsFromBody(body []byte) ([]models.Metrics, error) {
 }
 
 func getListOfMetricsNames(metrics []models.Metrics) []string {
-	var metricsNames []string
+	metricsNames := make([]string, 0, len(metrics))
 
 	for _, metric := range metrics {
 		metricsNames = append(metricsNames, metric.ID)
@@ -120,17 +115,14 @@ func getListOfMetricsNames(metrics []models.Metrics) []string {
 
 type AuditResponseWriter struct {
 	http.ResponseWriter
-	responseData responseData
+	status int
 }
 
 func (w *AuditResponseWriter) WriteHeader(statusCode int) {
-	w.responseData.status = statusCode
-	w.ResponseWriter.WriteHeader(w.responseData.status)
+	w.status = statusCode
+	w.ResponseWriter.WriteHeader(statusCode)
 }
 
 func (w *AuditResponseWriter) Write(data []byte) (int, error) {
-	w.responseData.body = data
-	size, err := w.ResponseWriter.Write(data)
-	w.responseData.size += size
-	return size, err
+	return w.ResponseWriter.Write(data)
 }

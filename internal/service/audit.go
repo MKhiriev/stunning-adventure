@@ -35,6 +35,11 @@ func NewAuditService(filePath string, adapter adapters.AuditEventAdapter, logger
 			Msg("remote server observer was not created")
 	}
 
+	// if no observers are registered
+	if len(service.observers) == 0 {
+		return nil
+	}
+
 	return service
 }
 

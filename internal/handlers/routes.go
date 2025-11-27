@@ -46,7 +46,9 @@ func (h *Handler) Init() *chi.Mux {
 		r.Get("/value/{metricType}/{metricName}", h.GetMetricValue)
 
 		r.Group(func(audit chi.Router) {
-			audit.Use(h.Audit)
+			if h.auditService != nil {
+				audit.Use(h.Audit)
+			}
 			audit.Post("/updates/", h.BatchUpdateMetricJSON)
 			audit.Post("/update/", h.UpdateMetricJSON)
 			audit.Post("/update/{metricType}/{metricName}/{metricValue}", h.MetricHandler)
