@@ -3,6 +3,7 @@ package handlers
 import (
 	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/internal/service"
+	"github.com/MKhiriev/stunning-adventure/internal/utils"
 	"github.com/MKhiriev/stunning-adventure/internal/validators"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -20,6 +21,8 @@ type Handler struct {
 }
 
 func NewHandler(metricsService service.MetricsService, dbPingService service.PingService, auditService service.AuditPublisher, cfg *config.ServerConfig, logger *zerolog.Logger) *Handler {
+	utils.InitHasherPool(cfg.HashKey)
+
 	return &Handler{
 		logger:         logger,
 		metricsService: metricsService,

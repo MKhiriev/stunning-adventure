@@ -5,12 +5,24 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"hash"
+	"sync"
 
 	"github.com/MKhiriev/stunning-adventure/models"
 )
 
+var hasherPool sync.Pool
+
 type Hasher struct {
 	hashKey []byte
+}
+
+func InitHasherPool(hashKey string) {
+	hasherPool = sync.Pool{
+		New: func() any {
+			return hmac.New(sha256.New, []byte(hashKey))
+		},
+	}
 }
 
 func NewHasher(hashKey string) *Hasher {
@@ -50,8 +62,15 @@ func (h *Hasher) HashMetrics(metrics ...models.Metrics) ([]byte, error) {
 	return hashedMetric, nil
 }
 
-func Hash(data []byte, hashKey string) []byte {
-	hasher := hmac.New(sha256.New, []byte(hashKey))
-	hasher.Write(data)
-	return hasher.Sum(nil)
+func Hash(data []byte) []byte {
+	h := hasherPool.Get().(hash.Hash)
+	h.Reset()
+
+	h.Write(data)
+	sum := h.Sum(nil)
+
+	h.Reset()
+	hasherPool.Put(h)
+
+	return sum
 }

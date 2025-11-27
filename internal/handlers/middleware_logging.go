@@ -33,12 +33,6 @@ func (h *Handler) WithLogging(handler http.Handler) http.Handler {
 	return http.HandlerFunc(logFn)
 }
 
-type responseData struct {
-	status int
-	size   int
-	body   []byte
-}
-
 type loggingResponseWriter struct {
 	http.ResponseWriter // встраиваем оригинальный http.ResponseWriter
 	status              int
