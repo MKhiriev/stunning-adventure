@@ -33,7 +33,7 @@ func NewHandler(metricsService service.MetricsService, dbPingService service.Pin
 
 func (h *Handler) Init() *chi.Mux {
 	router := chi.NewRouter()
-	router.Use(middleware.Recoverer, h.WithLogging, WithContext)
+	router.Use(middleware.Recoverer, h.WithLogging)
 
 	router.Mount("/debug", middleware.Profiler())
 
