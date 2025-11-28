@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	"github.com/MKhiriev/stunning-adventure/internal/adapters"
@@ -134,7 +133,8 @@ func TestGetValueFromMetric(t *testing.T) {
 }
 
 func initHandler() *Handler {
-	logger := zerolog.New(os.Stdout).With().Logger()
+	//logger := zerolog.New(os.Stdout).With().Logger()
+	logger := zerolog.Nop()
 	cfg := &config.ServerConfig{
 		ServerAddress: "localhost:8080",
 		StoreInterval: 300,
