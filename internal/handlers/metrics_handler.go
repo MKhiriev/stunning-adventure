@@ -24,7 +24,7 @@ func (h *Handler) BatchUpdateMetricJSON(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	h.logger.Info().Str("func", "*Handler.BatchUpdateMetricJSON").Interface("metrics from body", metricsFromBody).Msg("BatchUpdateMetricJSON was called!")
+	h.logger.Info().Str("func", "*Handler.BatchUpdateMetricJSON").Msg("BatchUpdateMetricJSON was called!")
 
 	// update all values + validation
 	if err := h.metricsService.SaveAll(ctx, metricsFromBody); err != nil {

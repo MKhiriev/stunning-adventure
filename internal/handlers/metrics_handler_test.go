@@ -146,7 +146,7 @@ func initHandler() *Handler {
 	db := store.DB{}
 	allAdapters := adapters.NewAdapters(cfg.AuditURL, &logger)
 
-	validationService := service.NewValidatingMetricsService(&logger)
+	validationService := service.NewValidatingMetricsService()
 	metricsService, _ := service.NewMetricsServiceBuilder(cfg, &logger).
 		WithCache(memStorage).
 		WithFile(fileStorage).

@@ -35,7 +35,7 @@ func main() {
 		log.Err(err).Msg("file storage creation failed")
 	}
 
-	metricsValidationService := service.NewValidatingMetricsService(log)
+	metricsValidationService := service.NewValidatingMetricsService()
 	metricsService, err := service.NewMetricsServiceBuilder(cfg, log).
 		WithDB(conn).
 		WithFile(fileStorage).
