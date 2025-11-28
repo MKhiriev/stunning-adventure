@@ -25,6 +25,8 @@ func ExampleHandler_BatchUpdateMetricJSON() {
 	h.BatchUpdateMetricJSON(w, req)
 
 	resp := w.Result()
+	defer resp.Body.Close()
+
 	fmt.Println(resp.StatusCode)
 
 	// Output:
@@ -44,6 +46,8 @@ func ExampleHandler_UpdateMetricJSON() {
 	h.UpdateMetricJSON(w, req)
 
 	resp := w.Result()
+	defer resp.Body.Close()
+
 	fmt.Println(resp.StatusCode)
 
 	// Output:
@@ -62,6 +66,8 @@ func ExampleHandler_GetMetricValue() {
 	h.GetMetricValue(w, req)
 
 	resp := w.Result()
+	defer resp.Body.Close()
+
 	fmt.Println(resp.StatusCode)
 
 	// Output:
@@ -81,6 +87,8 @@ func ExampleHandler_GetMetricJSON() {
 	h.GetMetricJSON(w, req)
 
 	resp := w.Result()
+	defer resp.Body.Close()
+
 	fmt.Println(resp.StatusCode)
 
 	// Output:
