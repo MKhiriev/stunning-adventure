@@ -1,3 +1,11 @@
+// Package main provides entry points for both the metrics server and metrics agent.
+//
+// The server main initializes configuration, logging, adapters, storage layers
+// (database, file, memory cache), and the metrics service pipeline. It then starts
+// an HTTP server to handle incoming metric collection and audit events.
+//
+// The agent main initializes configuration and logging, creates a MetricsAgent,
+// and starts its routine to collect, cache, and send system metrics to the server.
 package main
 
 import (

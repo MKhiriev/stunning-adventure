@@ -1,3 +1,8 @@
+// Package main provides the entry point for the metrics agent application.
+//
+// The agent collects system metrics on the host machine, caches them in memory,
+// and periodically sends them to the metrics server. It leverages the MetricsAgent
+// abstraction for polling, batching, and sending metrics.
 package main
 
 import (
