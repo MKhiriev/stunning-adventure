@@ -18,6 +18,8 @@ func ExampleHandler_BatchUpdateMetricJSON() {
 
 	body := `[{"id":"PollCount","type":"counter","delta":2},{"id":"FreeMemory","type":"gauge","value":184582144}]`
 	req := httptest.NewRequest(http.MethodPost, "/updates/", bytes.NewBufferString(body))
+	defer req.Body.Close()
+
 	w := httptest.NewRecorder()
 
 	h.BatchUpdateMetricJSON(w, req)
@@ -35,6 +37,8 @@ func ExampleHandler_UpdateMetricJSON() {
 
 	body := `{"id":"PollCount","type":"counter","delta":2}`
 	req := httptest.NewRequest(http.MethodPost, "/update/", bytes.NewBufferString(body))
+	defer req.Body.Close()
+
 	w := httptest.NewRecorder()
 
 	h.UpdateMetricJSON(w, req)
@@ -51,6 +55,8 @@ func ExampleHandler_GetMetricValue() {
 	h := initExampleHandler()
 
 	req := httptest.NewRequest(http.MethodGet, "/value/counter/PollCount", nil)
+	defer req.Body.Close()
+
 	w := httptest.NewRecorder()
 
 	h.GetMetricValue(w, req)
@@ -68,6 +74,8 @@ func ExampleHandler_GetMetricJSON() {
 
 	body := `{"id":"PollCount","type":"counter"}`
 	req := httptest.NewRequest(http.MethodPost, "/value/", bytes.NewBufferString(body))
+	defer req.Body.Close()
+
 	w := httptest.NewRecorder()
 
 	h.GetMetricJSON(w, req)
