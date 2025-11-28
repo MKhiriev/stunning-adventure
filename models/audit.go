@@ -9,7 +9,7 @@ import (
 type AuditEvent struct {
 	TimeStamp int64    `json:"ts"`         // Unix timestamp of event
 	Metrics   []string `json:"metrics"`    // Metric names that were sent by agent
-	IpAddress string   `json:"ip_address"` // IP address from metrics agent
+	IPAddress string   `json:"ip_address"` // IP address from metrics agent
 }
 
 func NewAuditEvent(ipAddress string, ts time.Time, metricNames ...string) (AuditEvent, error) {
@@ -20,6 +20,6 @@ func NewAuditEvent(ipAddress string, ts time.Time, metricNames ...string) (Audit
 	return AuditEvent{
 		TimeStamp: ts.Unix(),
 		Metrics:   metricNames,
-		IpAddress: ipAddress,
+		IPAddress: ipAddress,
 	}, nil
 }
