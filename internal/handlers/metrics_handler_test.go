@@ -5,9 +5,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
+	"github.com/MKhiriev/stunning-adventure/internal/adapters"
 	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/internal/service"
 	"github.com/MKhiriev/stunning-adventure/internal/store"
@@ -133,7 +133,8 @@ func TestGetValueFromMetric(t *testing.T) {
 }
 
 func initHandler() *Handler {
-	logger := zerolog.New(os.Stdout).With().Logger()
+	//logger := zerolog.New(os.Stdout).With().Logger()
+	logger := zerolog.Nop()
 	cfg := &config.ServerConfig{
 		ServerAddress: "localhost:8080",
 		StoreInterval: 300,
@@ -143,8 +144,9 @@ func initHandler() *Handler {
 	memStorage := store.NewMemStorage(&logger)
 	fileStorage, _ := store.NewFileStorage(context.Background(), memStorage, cfg, &logger)
 	db := store.DB{}
+	allAdapters := adapters.NewAdapters(cfg.AuditURL, &logger)
 
-	validationService := service.NewValidatingMetricsService(&logger)
+	validationService := service.NewValidatingMetricsService()
 	metricsService, _ := service.NewMetricsServiceBuilder(cfg, &logger).
 		WithCache(memStorage).
 		WithFile(fileStorage).
@@ -153,7 +155,9 @@ func initHandler() *Handler {
 		Build() //, &db, memStorage, cfg, &logger
 	dbPingService, _ := service.NewPingDBService(&db, &logger)
 
-	return NewHandler(metricsService, dbPingService, cfg, &logger)
+	auditService := service.NewAuditService(cfg.AuditFile, allAdapters.AuditEventAdapter, &logger)
+
+	return NewHandler(metricsService, dbPingService, auditService, cfg, &logger)
 }
 
 func mDelta(v int) *int64 {

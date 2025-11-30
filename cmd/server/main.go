@@ -1,8 +1,17 @@
+// Package main provides entry points for both the metrics server and metrics agent.
+//
+// The server main initializes configuration, logging, adapters, storage layers
+// (database, file, memory cache), and the metrics service pipeline. It then starts
+// an HTTP server to handle incoming metric collection and audit events.
+//
+// The agent main initializes configuration and logging, creates a MetricsAgent,
+// and starts its routine to collect, cache, and send system metrics to the server.
 package main
 
 import (
 	"context"
 
+	"github.com/MKhiriev/stunning-adventure/internal/adapters"
 	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/internal/handlers"
 	"github.com/MKhiriev/stunning-adventure/internal/logger"
@@ -19,7 +28,10 @@ func main() {
 		log.Err(err).Msg("invalid server configuration was passed")
 		return
 	}
-	log.Info().Any("cfg-srv", cfg).Msg("Server started")
+	log.Debug().Any("cfg-srv", cfg).Send()
+	log.Info().Msg("Server started")
+
+	allAdapters := adapters.NewAdapters(cfg.AuditURL, log)
 
 	memStorage := store.NewMemStorage(log)
 	conn, err := store.NewConnectPostgres(ctx, cfg, log)
@@ -31,7 +43,7 @@ func main() {
 		log.Err(err).Msg("file storage creation failed")
 	}
 
-	metricsValidationService := service.NewValidatingMetricsService(log)
+	metricsValidationService := service.NewValidatingMetricsService()
 	metricsService, err := service.NewMetricsServiceBuilder(cfg, log).
 		WithDB(conn).
 		WithFile(fileStorage).
@@ -47,8 +59,9 @@ func main() {
 		log.Err(err).Msg("creation of ping db service failed")
 		return
 	}
+	auditService := service.NewAuditService(cfg.AuditFile, allAdapters.AuditEventAdapter, log)
 
-	handler := handlers.NewHandler(metricsService, pingService, cfg, log)
+	handler := handlers.NewHandler(metricsService, pingService, auditService, cfg, log)
 	myServer := new(server.Server)
 	myServer.ServerRun(handler.Init(), cfg)
 }

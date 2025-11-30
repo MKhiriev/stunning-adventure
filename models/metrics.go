@@ -1,3 +1,11 @@
+// Package models provides core data structures and types used across the metrics system.
+// It defines metric types, their serialization formats, and utility functions for creation
+// and string representation. Metrics are represented in a flat structure, distinguishing
+// between unset and zero values via pointer fields (Delta and Value).
+//
+// Supported metric types:
+//   - Counter: integer-based metrics representing cumulative counts
+//   - Gauge: floating-point metrics representing instantaneous measurements
 package models
 
 import (
@@ -8,8 +16,13 @@ import (
 )
 
 const (
+	// Counter identifies a metric of type "counter".
+	// Counter metrics represent integer increments accumulated over time.
 	Counter = "counter"
-	Gauge   = "gauge"
+
+	// Gauge identifies a metric of type "gauge".
+	// Gauge metrics represent floating-point values sampled at a moment in time.
+	Gauge = "gauge"
 )
 
 var allowedTypes = []string{Counter, Gauge}
@@ -27,6 +40,25 @@ type Metrics struct {
 	Hash  string   `json:"hash,omitempty"`
 }
 
+// NewMetric creates a fully-specified metric from textual inputs.
+// It validates the metric type, checks for non-empty parameters,
+// and parses the textual value according to the metric type.
+//
+// Behavior:
+//   - Returns an error if ID, MType, or value are empty
+//   - Rejects unsupported metric types
+//   - Parses value as float64 for gauge or int64 for counter
+//
+// Parameters:
+//
+//	ID    - metric identifier string
+//	MType - metric type ("counter" or "gauge")
+//	Value - string value to be parsed into Delta or Value
+//
+// Returns:
+//
+//	Metrics - constructed metric with parsed value
+//	error   - validation or parsing failure
 func NewMetric(ID, MType, Value string) (Metrics, error) {
 	// check if not nil vals and type is Counter or gauge
 	if ID == "" || MType == "" || !slices.Contains(allowedTypes, MType) || Value == "" {
@@ -46,15 +78,6 @@ func NewMetric(ID, MType, Value string) (Metrics, error) {
 	}
 
 	return metric, nil
-}
-
-func NewMetricWithoutValue(ID, MType string) (Metrics, error) {
-	// check if not nil vals and type is Counter or gauge
-	if ID == "" || MType == "" || !slices.Contains(allowedTypes, MType) {
-		return Metrics{}, errors.New("passed metric params are not valid")
-	}
-
-	return Metrics{ID: ID, MType: MType}, nil
 }
 
 func newGauge(ID, MType, Value string) (Metrics, error) {
@@ -83,6 +106,8 @@ func newCounter(ID, MType, Value string) (Metrics, error) {
 	}, nil
 }
 
+// String returns a human-readable string representation of a metric,
+// selecting the appropriate value field depending on its type.
 func (m *Metrics) String() string {
 	if m.MType == Gauge {
 		return fmt.Sprintf(`{ID: %s, MType: %s, Value: %.0f}`,

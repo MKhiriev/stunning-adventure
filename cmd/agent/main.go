@@ -1,3 +1,8 @@
+// Package main provides the entry point for the metrics agent application.
+//
+// The agent collects system metrics on the host machine, caches them in memory,
+// and periodically sends them to the metrics server. It leverages the MetricsAgent
+// abstraction for polling, batching, and sending metrics.
 package main
 
 import (
@@ -9,7 +14,7 @@ import (
 func main() {
 	cfg := config.GetAgentConfigs()
 	log := logger.NewLogger("metrics-agent")
-	log.Debug().Any("cfg-agent", cfg).Msg("")
+	log.Debug().Any("cfg-agent", cfg).Send()
 	log.Info().Msg("Agent started")
 
 	err := agent.NewMetricsAgent("updates", cfg, log).Run()

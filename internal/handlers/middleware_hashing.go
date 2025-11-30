@@ -33,7 +33,7 @@ func (h *Handler) WithHashing(next http.Handler) http.Handler {
 		}
 		r.Body = io.NopCloser(bytes.NewReader(body))
 
-		hashedBody := hex.EncodeToString(utils.Hash(body, h.hashKey))
+		hashedBody := hex.EncodeToString(utils.Hash(body))
 		if hashedBody != hashFromHeader {
 			h.logger.Error().Str("func", "*Handler.WithHashing").
 				Str("hash from header", hashFromHeader).
@@ -49,35 +49,24 @@ func (h *Handler) WithHashing(next http.Handler) http.Handler {
 			Msg("hashes are equal")
 		rw := &HashingResponseWriter{
 			ResponseWriter: w,
-			hashKey:        h.hashKey,
 		}
 
 		next.ServeHTTP(rw, r)
-
-		h.logger.Debug().
-			Bytes("body", rw.responseData.body).
-			Int("status code", rw.responseData.status).
-			Any("headers", w.Header()).
-			Msg("preparing to write response")
 	})
 }
 
 type HashingResponseWriter struct {
 	http.ResponseWriter
-	responseData
-	hashKey string
+	status int
 }
 
 func (w *HashingResponseWriter) WriteHeader(statusCode int) {
-	w.responseData.status = statusCode
+	w.status = statusCode
 }
 
 func (w *HashingResponseWriter) Write(data []byte) (int, error) {
-	w.responseData.body = data
-	hashFromResponseBody := hex.EncodeToString(utils.Hash(w.responseData.body, w.hashKey))
+	hashFromResponseBody := hex.EncodeToString(utils.Hash(data))
 	w.Header().Set("HashSHA256", hashFromResponseBody)
-	w.ResponseWriter.WriteHeader(w.responseData.status)
-	size, err := w.ResponseWriter.Write(data)
-	w.responseData.size += size
-	return size, err
+	w.ResponseWriter.WriteHeader(w.status)
+	return w.ResponseWriter.Write(data)
 }

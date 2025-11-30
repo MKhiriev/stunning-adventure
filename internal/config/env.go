@@ -1,3 +1,6 @@
+// Package config provides flag-parsing utilities for server and agent binaries.
+// It defines configuration defaults, a NetAddress type implementing flag.Value,
+// and parsing helpers returning fully resolved configuration parameters.
 package config
 
 import (
@@ -7,23 +10,44 @@ import (
 	"github.com/caarlos0/env/v11"
 )
 
+// AgentConfig
+//
+//	Configuration for the agent component of the system.
+//	Holds network, reporting, polling, hashing, and rate-limiting settings.
 type AgentConfig struct {
-	ServerAddress  string `env:"ADDRESS"`
-	ReportInterval int64  `env:"REPORT_INTERVAL"`
-	PollInterval   int64  `env:"POLL_INTERVAL"`
-	HashKey        string `env:"KEY"`
-	RateLimit      int64  `env:"RATE_LIMIT"`
+	ServerAddress  string `env:"ADDRESS"`         // address of the server to send metrics to
+	ReportInterval int64  `env:"REPORT_INTERVAL"` // interval in seconds between sending metrics to server
+	PollInterval   int64  `env:"POLL_INTERVAL"`   // interval in seconds to read metrics from system
+	HashKey        string `env:"KEY"`             // key used for hashing metric payloads
+	RateLimit      int64  `env:"RATE_LIMIT"`      // maximum number of requests per second
 }
 
+// ServerConfig
+//
+//	Configuration for the server component.
+//	Controls server address, storage intervals, file persistence, database connection, hashing, and audit settings.
 type ServerConfig struct {
-	ServerAddress          string `env:"ADDRESS"`
-	StoreInterval          int64  `env:"STORE_INTERVAL"`
-	FileStoragePath        string `env:"FILE_STORAGE_PATH"`
-	RestoreMetricsFromFile bool   `env:"RESTORE"`
-	DatabaseDSN            string `env:"DATABASE_DSN"`
-	HashKey                string `env:"KEY"`
+	ServerAddress          string `env:"ADDRESS"`           // network address to bind the server
+	StoreInterval          int64  `env:"STORE_INTERVAL"`    // interval in seconds to persist metrics to storage
+	FileStoragePath        string `env:"FILE_STORAGE_PATH"` // file path for metric storage
+	RestoreMetricsFromFile bool   `env:"RESTORE"`           // flag to restore metrics from file on startup
+	DatabaseDSN            string `env:"DATABASE_DSN"`      // database connection string
+	HashKey                string `env:"KEY"`               // key used for hashing metric payloads
+
+	AuditFile string `env:"AUDIT_FILE"` // local file path for audit logs
+	AuditURL  string `env:"AUDIT_URL"`  // external URL to send audit logs
 }
 
+// GetAgentConfigs
+//
+// Description:
+//
+//	Loads agent configuration from environment variables.
+//	Falls back to command line flags or defaults if env variables are missing.
+//
+// Returns:
+//
+//	*AgentConfig - fully populated agent configuration struct
 func GetAgentConfigs() *AgentConfig {
 	cfg := &AgentConfig{}
 	err := env.Parse(cfg)
@@ -58,6 +82,18 @@ func GetAgentConfigs() *AgentConfig {
 	return cfg
 }
 
+// GetServerConfigs
+//
+// Description:
+//
+//	Loads server configuration from environment variables.
+//	Falls back to command line flags or defaults if env variables are missing.
+//	Validates required fields before returning.
+//
+// Returns:
+//
+//	*ServerConfig - fully populated server configuration struct
+//	error         - validation error if required fields are missing or invalid
 func GetServerConfigs() (*ServerConfig, error) {
 	cfg := &ServerConfig{}
 	err := env.Parse(cfg)
@@ -71,7 +107,9 @@ func GetServerConfigs() (*ServerConfig, error) {
 	}
 
 	// else get command line args or default values
-	commandLineServerAddress, commandLineStoreInterval, commandLineFileStoragePath, commandLineRestore, databaseDSN, commandLineHashKey := ParseServerFlags()
+	commandLineServerAddress, commandLineStoreInterval, commandLineFileStoragePath,
+		commandLineRestore, databaseDSN, commandLineHashKey,
+		commandLineAuditFilePath, commandLineAuditURL := ParseServerFlags()
 
 	if cfg.ServerAddress == "" {
 		cfg.ServerAddress = commandLineServerAddress
@@ -91,10 +129,26 @@ func GetServerConfigs() (*ServerConfig, error) {
 	if cfg.HashKey == "" {
 		cfg.HashKey = commandLineHashKey
 	}
+	if cfg.AuditFile == "" {
+		cfg.AuditFile = commandLineAuditFilePath
+	}
+	if cfg.AuditURL == "" {
+		cfg.AuditURL = commandLineAuditURL
+	}
 
 	return cfg, cfg.Validate()
 }
 
+// Validate
+//
+// Description:
+//
+//	Validates essential fields of ServerConfig.
+//	Ensures ServerAddress and StoreInterval are set.
+//
+// Returns:
+//
+//	error - descriptive error if validation fails, nil if valid
 func (s *ServerConfig) Validate() error {
 	switch {
 	case s.ServerAddress == "":

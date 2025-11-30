@@ -40,6 +40,10 @@ func NewConnectPostgres(ctx context.Context, cfg *config.ServerConfig, log *zero
 		log.Err(err).Str("func", "NewConnectPostgres").Msg("error occured during database connection")
 		return nil, fmt.Errorf("error occured during database connection: %w", err)
 	}
+
+	conn.SetMaxOpenConns(10)
+	conn.SetMaxOpenConns(4)
+
 	err = conn.PingContext(ctx)
 	if err != nil {
 		log.Err(err).Str("func", "NewConnectPostgres").Msg("error connecting database (ping)")
@@ -68,7 +72,7 @@ func NewConnectPostgres(ctx context.Context, cfg *config.ServerConfig, log *zero
 	return db, nil
 }
 
-func (db *DB) Save(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
+func (db *DB) Save(ctx context.Context, metric *models.Metrics) (models.Metrics, error) {
 	var result models.Metrics
 	err := db.withRetry(ctx, "*DB.Save", func() error {
 		var saveErr error
@@ -86,7 +90,7 @@ func (db *DB) SaveAll(ctx context.Context, metrics []models.Metrics) error {
 	return err
 }
 
-func (db *DB) Get(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
+func (db *DB) Get(ctx context.Context, metric *models.Metrics) (models.Metrics, error) {
 	var foundMetric models.Metrics
 	err := db.withRetry(ctx, "*DB.Get", func() error {
 		var getErr error
@@ -147,28 +151,28 @@ func (db *DB) withRetry(ctx context.Context, operation string, fn func() error) 
 	return err
 }
 
-func (db *DB) saveMetric(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
+func (db *DB) saveMetric(ctx context.Context, metric *models.Metrics) (models.Metrics, error) {
 	if metric.MType == models.Gauge || metric.MType == models.Counter {
-		db.logger.Info().Str("func", "*DB.saveMetric").Any("metric", metric).Msg("trying to save metric")
+		db.logger.Info().Str("func", "*DB.saveMetric").Str("metric name", metric.ID).Msg("trying to save metric")
 		// save metric in db
 		row := db.QueryRowContext(ctx, insertMetricsQuery, metric.ID, metric.MType, metric.Delta, metric.Value)
 		if err := row.Err(); err != nil {
-			db.logger.Error().Err(err).Str("func", "*DB.saveMetric").Msg("error: row is nil")
+			db.logger.Err(err).Str("func", "*DB.saveMetric").Msg("error: row is nil")
 			return models.Metrics{}, err
 		}
 
 		// scan saved metric from db
 		if err := row.Scan(&metric.ID, &metric.MType, &metric.Delta, &metric.Value); err != nil {
-			db.logger.Error().Err(err).Str("func", "*DB.saveMetric").Msg("error: scanning error")
+			db.logger.Err(err).Str("func", "*DB.saveMetric").Msg("error: scanning error")
 			return models.Metrics{}, err
 		}
 	} else {
-		db.logger.Error().Str("func", "*DB.saveMetric").Any("metric", metric).Msg("unsupported metric type was passed")
+		db.logger.Error().Str("func", "*DB.saveMetric").Str("metric", metric.ID).Str("metric type", metric.MType).Msg("unsupported metric type was passed")
 		return models.Metrics{}, errors.New("unsupported metric type was passed")
 	}
 
 	// return saved in db metric
-	return metric, nil
+	return *metric, nil
 }
 
 func (db *DB) saveAllMetrics(ctx context.Context, metrics []models.Metrics) error {
@@ -194,14 +198,14 @@ func (db *DB) saveAllMetrics(ctx context.Context, metrics []models.Metrics) erro
 		var result sql.Result
 		var statementExecutionError error
 		if metric.MType == models.Gauge || metric.MType == models.Counter {
-			db.logger.Info().Str("func", "*DB.saveAllMetrics").Any("metric", metric).Int("iteration", idx).Msg("trying to save metric")
+			db.logger.Info().Str("func", "*DB.saveAllMetrics").Str("metric", metric.ID).Int("iteration", idx).Msg("trying to save metric")
 			result, statementExecutionError = stmt.ExecContext(ctx, metric.ID, metric.MType, metric.Delta, metric.Value)
 			if statementExecutionError != nil {
-				db.logger.Err(statementExecutionError).Str("func", "*DB.saveAllMetrics").Any("metric", metric).Int("iteration", idx).Msg("error executing prepared UPSERT query for saving metric")
+				db.logger.Err(statementExecutionError).Str("func", "*DB.saveAllMetrics").Str("metric", metric.ID).Int("iteration", idx).Msg("error executing prepared UPSERT query for saving metric")
 				return statementExecutionError
 			}
 		} else {
-			db.logger.Error().Str("func", "*DB.saveAllMetrics").Any("metric", metric).Int("iteration", idx).Msg("unsupported metric type was passed")
+			db.logger.Error().Str("func", "*DB.saveAllMetrics").Str("metric", metric.ID).Str("metric type", metric.MType).Int("iteration", idx).Msg("unsupported metric type was passed")
 			return errors.New("unsupported metric type was passed")
 		}
 
@@ -216,8 +220,8 @@ func (db *DB) saveAllMetrics(ctx context.Context, metrics []models.Metrics) erro
 	return tx.Commit()
 }
 
-func (db *DB) getMetric(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
-	db.logger.Info().Str("func", "*DB.getMetric").Any("metric to find", metric).Msg("trying to find metric")
+func (db *DB) getMetric(ctx context.Context, metric *models.Metrics) (models.Metrics, error) {
+	db.logger.Info().Str("func", "*DB.getMetric").Str("metric to find", metric.ID).Msg("trying to find metric")
 	// query row with given name and type
 	row := db.QueryRowContext(ctx, getMetric, metric.ID, metric.MType)
 	// scan resulting row
@@ -231,8 +235,8 @@ func (db *DB) getMetric(ctx context.Context, metric models.Metrics) (models.Metr
 		db.logger.Err(err).Str("func", "*DB.getMetric").Msg("error occurred during scanning")
 		return models.Metrics{}, err
 	default:
-		db.logger.Info().Str("func", "*DB.getMetric").Any("found metric", metric).Msg("metric IS found")
-		return metric, nil
+		db.logger.Info().Str("func", "*DB.getMetric").Str("found metric", metric.ID).Msg("metric IS found")
+		return *metric, nil
 	}
 }
 

@@ -21,7 +21,7 @@ type FileStorage struct {
 
 func NewFileStorage(ctx context.Context, memStorage *MemStorage, cfg *config.ServerConfig, log *zerolog.Logger) (*FileStorage, error) {
 	if cfg.FileStoragePath == "" {
-		log.Error().Msg("no file storage path was provided")
+		log.Error().Str("func", "store.NewFileStorage").Msg("no file storage path was provided")
 		return nil, errors.New("no file storage path was provided")
 	}
 
@@ -111,18 +111,18 @@ func (fs *FileStorage) LoadMetricsFromFile(context.Context) ([]models.Metrics, e
 	return loadedMetrics, nil
 }
 
-func (fs *FileStorage) Save(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
+func (fs *FileStorage) Save(ctx context.Context, metric *models.Metrics) (models.Metrics, error) {
 	fs.memStorage.mu.Lock()
 	defer fs.memStorage.mu.Unlock()
 
 	// save metric to file
-	fs.memStorage.Memory[metric.ID] = metric
+	fs.memStorage.Memory[metric.ID] = *metric
 	if err := fs.SaveMetricsToFile(ctx, fs.memStorage.GetAllMetrics(ctx)); err != nil {
 		fs.log.Err(err).Str("func", "*FileStorage.Save").Msg("error during saving metric to a file")
 		return models.Metrics{}, err
 	}
 
-	return metric, nil
+	return *metric, nil
 }
 
 func (fs *FileStorage) SaveAll(ctx context.Context, metrics []models.Metrics) error {
@@ -130,7 +130,7 @@ func (fs *FileStorage) SaveAll(ctx context.Context, metrics []models.Metrics) er
 	return fs.SaveMetricsToFile(ctx, metrics)
 }
 
-func (fs *FileStorage) Get(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
+func (fs *FileStorage) Get(ctx context.Context, metric *models.Metrics) (models.Metrics, error) {
 	metrics, err := fs.LoadMetricsFromFile(ctx)
 	if err != nil {
 		fs.log.Err(err).Str("func", "*FileStorage.Get").Msg("error during getting metric from file")

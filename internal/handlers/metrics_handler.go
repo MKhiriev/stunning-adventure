@@ -13,6 +13,22 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// BatchUpdateMetricJSON
+//
+// Description:
+//
+//	Handles batch update of metrics in JSON format.
+//	Validates each metric and saves them via metricsService.
+//
+// Input:
+//
+//	metrics JSON: `[{"id":"PollCount","type":"counter","delta":2},{"id":"FreeMemory","type":"gauge","value":184582144}]`
+//
+// Responses:
+//
+//   - 200 OK - all metrics updated successfully
+//   - 400 Bad Request - invalid JSON or metric validation failed
+//   - 500 Internal Server Error - service error while saving
 func (h *Handler) BatchUpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var metricsFromBody []models.Metrics
@@ -24,7 +40,7 @@ func (h *Handler) BatchUpdateMetricJSON(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	h.logger.Info().Str("func", "*Handler.BatchUpdateMetricJSON").Interface("metrics from body", metricsFromBody).Msg("BatchUpdateMetricJSON was called!")
+	h.logger.Info().Str("func", "*Handler.BatchUpdateMetricJSON").Msg("BatchUpdateMetricJSON was called!")
 
 	// update all values + validation
 	if err := h.metricsService.SaveAll(ctx, metricsFromBody); err != nil {
@@ -43,6 +59,22 @@ func (h *Handler) BatchUpdateMetricJSON(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusOK)
 }
 
+// UpdateMetricJSON
+//
+// Description:
+//
+//	Handles update of a single metric in JSON format.
+//	Validates the metric, saves via metricsService, and returns updated state.
+//
+// Input:
+//
+//	metric JSON: `{"id":"PollCount","type":"counter","delta":2}`
+//
+// Responses:
+//
+//   - 200 OK - updated metric returned in JSON
+//   - 400 Bad Request - invalid metric or JSON
+//   - 500 Internal Server Error - service error while saving
 func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var metricFromBody models.Metrics
@@ -58,7 +90,7 @@ func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	// 3. Update metric's value based on it's type + validation
-	if metricFromBody, err = h.metricsService.Save(ctx, metricFromBody); err != nil {
+	if metricFromBody, err = h.metricsService.Save(ctx, &metricFromBody); err != nil {
 		switch {
 		case errors.Is(err, validators.ErrEmptyID) || errors.Is(err, validators.ErrEmptyType) || errors.Is(err, validators.ErrNoValue) || errors.Is(err, validators.ErrInvalidType):
 			h.logger.Err(err).Caller().Str("func", "*Handler.UpdateMetricJSON").Any("metric", metricFromBody).Msg("passed metric is not valid")
@@ -86,6 +118,23 @@ func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 	w.Write(savedMetricJSON)
 }
 
+// GetMetricJSON
+//
+// Description:
+//
+//	Retrieves a metric by ID and type.
+//	Validates parameters and fetches via metricsService.
+//
+// Input:
+//
+//	metric JSON without value: `{"id":"PollCount","type":"counter"}`
+//
+// Responses:
+//
+//   - 200 OK - found metric in JSON
+//   - 400 Bad Request - invalid metric parameters
+//   - 404 Not Found - metric not found
+//   - 500 Internal Server Error - error marshalling JSON
 func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	w.Header().Set("Content-Type", "application/json")
@@ -99,7 +148,7 @@ func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 3. Find metric in memory
-	foundMetric, err := h.metricsService.Get(ctx, metric)
+	foundMetric, err := h.metricsService.Get(ctx, &metric)
 	if err != nil {
 		switch {
 		case errors.Is(err, store.ErrNotFound):
@@ -130,6 +179,25 @@ func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	w.Write(foundMetricJSON)
 }
 
+// MetricHandler
+//
+// Description:
+//
+//	Creates or updates a metric via URL parameters.
+//	Validates name, type, and value, then saves via metricsService.
+//
+// Input (URL params):
+//
+//   - metricName: "PollCount"
+//   - metricType: "counter"
+//   - metricValue: "123"
+//
+// Responses:
+//
+//   - 200 OK - metric created or updated successfully
+//   - 400 Bad Request - invalid metric parameters or value
+//   - 404 Not Found - empty metric name
+//   - 500 Internal Server Error - error saving metric
 func (h *Handler) MetricHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	w.Header().Add("Content-Type", "text/plain")
@@ -163,7 +231,7 @@ func (h *Handler) MetricHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = h.metricsService.Save(ctx, metric)
+	_, err = h.metricsService.Save(ctx, &metric)
 	if err != nil {
 		h.logger.Err(err).Caller().Str("func", "*Handler.MetricHandler").Msg("error during saving metric")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -173,6 +241,23 @@ func (h *Handler) MetricHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// GetMetricValue
+//
+// Description:
+//
+//	Returns the value of a metric by name and type from URL parameters.
+//	Fetches the full metric via metricsService and outputs only the value.
+//
+// Input (URL params):
+//
+//   - metricName: "PollCount"
+//   - metricType: "counter"
+//
+// Responses:
+//
+//   - 200 OK - metric value in plain text
+//   - 400 Bad Request - invalid metric type
+//   - 404 Not Found - metric not found or empty name
 func (h *Handler) GetMetricValue(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	w.Header().Add("Content-Type", "text/plain")
@@ -180,7 +265,7 @@ func (h *Handler) GetMetricValue(w http.ResponseWriter, r *http.Request) {
 	mType := chi.URLParam(r, "metricType")
 
 	// business logic + validation
-	metric, err := h.metricsService.Get(ctx, models.Metrics{ID: id, MType: mType})
+	metric, err := h.metricsService.Get(ctx, &models.Metrics{ID: id, MType: mType})
 
 	if err != nil {
 		switch {
@@ -201,6 +286,21 @@ func (h *Handler) GetMetricValue(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(h.getValueFromMetric(metric)))
 }
 
+// GetAllMetrics
+//
+// Description:
+//
+//	Returns an HTML page with all metrics.
+//	Retrieves all metrics via metricsService and renders via HTML templates.
+//
+// Input:
+//
+//	none (GET request without body)
+//
+// Responses:
+//
+//   - 200 OK - HTML page with metrics table
+//   - 500 Internal Server Error - error rendering templates or service failure
 func (h *Handler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	// TODO hide all HTML creation logic under new service
@@ -248,13 +348,4 @@ func (h *Handler) getValueFromMetric(metric models.Metrics) string {
 		return strconv.FormatFloat(*metric.Value, 'f', -1, 64)
 	}
 	return ""
-}
-
-func (h *Handler) checkValue(cond bool, ifNotEmptyError error) error {
-	if !cond {
-		h.logger.Error().Str("func", "*Handler.checkValue").Msg("value is not valid")
-		return ifNotEmptyError
-	}
-
-	return nil
 }

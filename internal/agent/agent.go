@@ -20,26 +20,29 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// MetricsAgent provides a concrete implementation of a local metrics collection agent.
+// It reads metrics from the host, caches them in memory, and sends them to a remote server.
 type MetricsAgent struct {
-	serverAddress  string
-	route          string
-	client         *resty.Client
-	memory         *AgentStorage
-	pollCount      int64
-	reportInterval int64
-	pollInterval   int64
-	mu             *sync.Mutex
+	serverAddress  string        // full server address including http://
+	route          string        // server route for sending metrics
+	client         *resty.Client // HTTP client for sending metrics
+	memory         *AgentStorage // in-memory storage for metrics
+	pollCount      int64         // number of polls since last report
+	reportInterval int64         // seconds between metric reports
+	pollInterval   int64         // seconds between metric reads
+	mu             *sync.Mutex   // mutex for thread safety
 	logger         *zerolog.Logger
-	retryIntervals map[int]time.Duration
+	retryIntervals map[int]time.Duration // mapping retry attempt to delay
 	hasher         *utils.Hasher
 	rateLimit      int64
 }
 
+// NewMetricsAgent initializes and returns a new MetricsAgent with configuration values.
 func NewMetricsAgent(route string, cfg *config.AgentConfig, logger *zerolog.Logger) *MetricsAgent {
 	agent := &MetricsAgent{
 		serverAddress:  "http://" + cfg.ServerAddress,
 		route:          route,
-		client:         newHTTPClient(),
+		client:         utils.NewHTTPClient(5 * time.Second),
 		memory:         NewStorage(),
 		pollCount:      0,
 		reportInterval: cfg.ReportInterval,
@@ -64,6 +67,7 @@ func NewMetricsAgent(route string, cfg *config.AgentConfig, logger *zerolog.Logg
 	return agent
 }
 
+// ReadMetrics reads runtime memory metrics and refreshes the in-memory cache.
 func (m *MetricsAgent) ReadMetrics() error {
 	memStats := runtime.MemStats{}
 	runtime.ReadMemStats(&memStats)
@@ -78,6 +82,7 @@ func (m *MetricsAgent) ReadMetrics() error {
 	return nil
 }
 
+// SendBatchMetricsJSON sends all metrics from memory as a single gzip-compressed JSON batch.
 func (m *MetricsAgent) SendBatchMetricsJSON() error {
 	// get all metrics from memory
 	allMetrics := m.memory.GetAllMetrics()
@@ -120,6 +125,7 @@ func (m *MetricsAgent) SendBatchMetricsJSON() error {
 	return nil
 }
 
+// SendMetricsJSON sends all metrics from memory individually as JSON.
 func (m *MetricsAgent) SendMetricsJSON() error {
 	// get all metrics from memory
 	allMetrics := m.memory.GetAllMetrics()
@@ -193,6 +199,8 @@ func (m *MetricsAgent) sendMetrics(metric ...models.Metrics) error {
 	return nil
 }
 
+// SendMetrics sends all cached metrics individually using HTTP POST requests.
+// It constructs a route based on metric type and value.
 func (m *MetricsAgent) SendMetrics() error {
 	// get all metrics from memory
 	allMetrics := m.memory.GetAllMetrics()
@@ -250,7 +258,7 @@ func (m *MetricsAgent) ReadMetricsGenerator(pollInterval *time.Ticker, reportInt
 	return metricsChannel
 }
 
-// SendMetricsWorker this func we run in separate goroutines
+// SendMetricsWorker consumes metric batches from a channel and sends them.
 func (m *MetricsAgent) SendMetricsWorker(metricBatches <-chan []models.Metrics) {
 	for batch := range metricBatches {
 		m.logger.Debug().Any("batch", batch).Msg("worker is called")
@@ -259,6 +267,8 @@ func (m *MetricsAgent) SendMetricsWorker(metricBatches <-chan []models.Metrics) 
 	}
 }
 
+// Run starts the MetricsAgent lifecycle, including reading metrics and sending
+// them with worker goroutines.
 func (m *MetricsAgent) Run() error {
 	// reading metrics part
 	pollTicker, reportTicker := getTickers(time.Duration(m.pollInterval)*time.Second, time.Duration(m.reportInterval)*time.Second)
@@ -273,10 +283,6 @@ func (m *MetricsAgent) Run() error {
 	m.logger.Debug().Str("func", "Run").Msg("workers are created")
 
 	select {} // block main routine forever
-}
-
-func newHTTPClient() *resty.Client {
-	return resty.New().SetDebug(true)
 }
 
 func getTickers(pollIntervalDuration time.Duration, reportIntervalDuration time.Duration) (*time.Ticker, *time.Ticker) {
