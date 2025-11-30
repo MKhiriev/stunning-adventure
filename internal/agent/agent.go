@@ -42,7 +42,7 @@ func NewMetricsAgent(route string, cfg *config.AgentConfig, logger *zerolog.Logg
 	agent := &MetricsAgent{
 		serverAddress:  "http://" + cfg.ServerAddress,
 		route:          route,
-		client:         utils.NewHTTPClient(),
+		client:         utils.NewHTTPClient(5 * time.Second),
 		memory:         NewStorage(),
 		pollCount:      0,
 		reportInterval: cfg.ReportInterval,

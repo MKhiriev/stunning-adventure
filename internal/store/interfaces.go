@@ -31,10 +31,10 @@ import (
 // It abstracts interactions with any underlying storage engine
 // (file, memory cache, database, or hybrid).
 type Storage interface {
-	Save(context.Context, models.Metrics) (models.Metrics, error) // persists a single metric and returns the updated stored version
-	SaveAll(context.Context, []models.Metrics) error              // persists a batch of metrics atomically
-	Get(context.Context, models.Metrics) (models.Metrics, error)  // retrieves a single metric by its identifier and type
-	GetAll(context.Context) ([]models.Metrics, error)             // returns all stored metrics
+	Save(context.Context, *models.Metrics) (models.Metrics, error) // persists a single metric and returns the updated stored version
+	SaveAll(context.Context, []models.Metrics) error               // persists a batch of metrics atomically
+	Get(context.Context, *models.Metrics) (models.Metrics, error)  // retrieves a single metric by its identifier and type
+	GetAll(context.Context) ([]models.Metrics, error)              // returns all stored metrics
 }
 
 // MetricsFileStorage defines an interface for handling metric persistence
@@ -47,10 +47,10 @@ type MetricsFileStorage interface {
 // MetricsCacheStorage defines an in-memory layer for metric manipulation.
 // Typically used for fast, non-persistent operations before flushing to disk/database.
 type MetricsCacheStorage interface {
-	AddCounter(context.Context, models.Metrics) (models.Metrics, error)                                      // increments or creates a counter metric
-	UpdateGauge(context.Context, models.Metrics) (models.Metrics, error)                                     // sets or updates a gauge metric
-	GetMetricByNameAndType(ctx context.Context, metricName string, metricType string) (models.Metrics, bool) // retrieves a metric by ID and type, returning (metric, found)
-	GetAllMetrics(context.Context) []models.Metrics                                                          // returns all metrics from cache memory
+	AddCounter(context.Context, *models.Metrics) (models.Metrics, error)                                      // increments or creates a counter metric
+	UpdateGauge(context.Context, *models.Metrics) (models.Metrics, error)                                     // sets or updates a gauge metric
+	GetMetricByNameAndType(ctx context.Context, metricName string, metricType string) (models.Metrics, error) // retrieves a metric by ID and type, returning (metric, found)
+	GetAllMetrics(context.Context) []models.Metrics                                                           // returns all metrics from cache memory
 }
 
 // MetricsDatabaseStorage defines persistence logic for database-backed storage layers.

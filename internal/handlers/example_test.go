@@ -101,18 +101,18 @@ func (m *mockMetricsService) SaveAll(ctx context.Context, metrics []models.Metri
 	return nil
 }
 
-func (m *mockMetricsService) Save(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
-	return metric, nil
+func (m *mockMetricsService) Save(ctx context.Context, metric *models.Metrics) (models.Metrics, error) {
+	return *metric, nil
 }
 
-func (m *mockMetricsService) Get(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
+func (m *mockMetricsService) Get(ctx context.Context, metric *models.Metrics) (models.Metrics, error) {
 	switch metric.MType {
-	case "counter":
+	case models.Counter:
 		d := int64(2)
-		return models.Metrics{ID: metric.ID, MType: "counter", Delta: &d}, nil
-	case "gauge":
+		return models.Metrics{ID: metric.ID, MType: models.Counter, Delta: &d}, nil
+	case models.Gauge:
 		v := 184582144.0
-		return models.Metrics{ID: metric.ID, MType: "gauge", Value: &v}, nil
+		return models.Metrics{ID: metric.ID, MType: models.Gauge, Value: &v}, nil
 	default:
 		return models.Metrics{}, nil
 	}
@@ -122,8 +122,8 @@ func (m *mockMetricsService) GetAll(ctx context.Context) ([]models.Metrics, erro
 	d := int64(2)
 	v := 184582144.0
 	return []models.Metrics{
-		{ID: "PollCount", MType: "counter", Delta: &d},
-		{ID: "FreeMemory", MType: "gauge", Value: &v},
+		{ID: "PollCount", MType: models.Counter, Delta: &d},
+		{ID: "FreeMemory", MType: models.Gauge, Value: &v},
 	}, nil
 }
 

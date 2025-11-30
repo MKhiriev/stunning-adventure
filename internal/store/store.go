@@ -21,7 +21,7 @@ func NewMemStorage(log *zerolog.Logger) *MemStorage {
 	return &MemStorage{Memory: make(map[string]models.Metrics), mu: &sync.Mutex{}, log: log}
 }
 
-func (m *MemStorage) AddCounter(ctx context.Context, metrics models.Metrics) (models.Metrics, error) {
+func (m *MemStorage) AddCounter(ctx context.Context, metrics *models.Metrics) (models.Metrics, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -41,14 +41,14 @@ func (m *MemStorage) AddCounter(ctx context.Context, metrics models.Metrics) (mo
 		result = val
 	} else {
 		// if metric name doesn't exist - add it
-		m.Memory[metrics.ID] = metrics
-		result = metrics
+		m.Memory[metrics.ID] = *metrics
+		result = *metrics
 	}
 
 	return result, nil
 }
 
-func (m *MemStorage) UpdateGauge(ctx context.Context, metrics models.Metrics) (models.Metrics, error) {
+func (m *MemStorage) UpdateGauge(ctx context.Context, metrics *models.Metrics) (models.Metrics, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -66,8 +66,8 @@ func (m *MemStorage) UpdateGauge(ctx context.Context, metrics models.Metrics) (m
 		result = val
 	} else {
 		// if metric name doesn't exist - add it
-		m.Memory[metrics.ID] = metrics
-		result = metrics
+		m.Memory[metrics.ID] = *metrics
+		result = *metrics
 	}
 
 	return result, nil
@@ -95,14 +95,14 @@ func (m *MemStorage) GetAllMetrics(ctx context.Context) []models.Metrics {
 	return slices.Collect(maps.Values(m.Memory))
 }
 
-func (m *MemStorage) Save(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
+func (m *MemStorage) Save(ctx context.Context, metric *models.Metrics) (models.Metrics, error) {
 	switch metric.MType {
 	case models.Counter:
 		return m.AddCounter(ctx, metric)
 	case models.Gauge:
 		return m.UpdateGauge(ctx, metric)
 	default:
-		return metric, errors.New("unsupported metric type")
+		return *metric, errors.New("unsupported metric type")
 	}
 }
 
@@ -111,12 +111,12 @@ func (m *MemStorage) SaveAll(ctx context.Context, metrics []models.Metrics) erro
 	for _, metric := range metrics {
 		switch metric.MType {
 		case models.Counter:
-			_, err = m.AddCounter(ctx, metric)
+			_, err = m.AddCounter(ctx, &metric)
 			if err != nil {
 				return err
 			}
 		case models.Gauge:
-			_, err = m.UpdateGauge(ctx, metric)
+			_, err = m.UpdateGauge(ctx, &metric)
 			if err != nil {
 				return err
 			}
@@ -127,7 +127,7 @@ func (m *MemStorage) SaveAll(ctx context.Context, metrics []models.Metrics) erro
 	return nil
 }
 
-func (m *MemStorage) Get(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
+func (m *MemStorage) Get(ctx context.Context, metric *models.Metrics) (models.Metrics, error) {
 	return m.GetMetricByNameAndType(ctx, metric.ID, metric.MType)
 }
 

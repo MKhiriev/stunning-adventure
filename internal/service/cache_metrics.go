@@ -16,7 +16,7 @@ type CacheMetricsService struct {
 	log           *zerolog.Logger
 }
 
-func (c *CacheMetricsService) Save(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
+func (c *CacheMetricsService) Save(ctx context.Context, metric *models.Metrics) (models.Metrics, error) {
 	// save metric in cache memory
 	result, err := c.cache.Save(ctx, metric)
 	if err != nil {
@@ -74,7 +74,7 @@ func (c *CacheMetricsService) SaveAll(ctx context.Context, metrics []models.Metr
 	return nil
 }
 
-func (c *CacheMetricsService) Get(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
+func (c *CacheMetricsService) Get(ctx context.Context, metric *models.Metrics) (models.Metrics, error) {
 	return c.cache.Get(ctx, metric)
 }
 

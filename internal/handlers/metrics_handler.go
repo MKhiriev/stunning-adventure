@@ -90,7 +90,7 @@ func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	// 3. Update metric's value based on it's type + validation
-	if metricFromBody, err = h.metricsService.Save(ctx, metricFromBody); err != nil {
+	if metricFromBody, err = h.metricsService.Save(ctx, &metricFromBody); err != nil {
 		switch {
 		case errors.Is(err, validators.ErrEmptyID) || errors.Is(err, validators.ErrEmptyType) || errors.Is(err, validators.ErrNoValue) || errors.Is(err, validators.ErrInvalidType):
 			h.logger.Err(err).Caller().Str("func", "*Handler.UpdateMetricJSON").Any("metric", metricFromBody).Msg("passed metric is not valid")
@@ -148,7 +148,7 @@ func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 3. Find metric in memory
-	foundMetric, err := h.metricsService.Get(ctx, metric)
+	foundMetric, err := h.metricsService.Get(ctx, &metric)
 	if err != nil {
 		switch {
 		case errors.Is(err, store.ErrNotFound):
@@ -231,7 +231,7 @@ func (h *Handler) MetricHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = h.metricsService.Save(ctx, metric)
+	_, err = h.metricsService.Save(ctx, &metric)
 	if err != nil {
 		h.logger.Err(err).Caller().Str("func", "*Handler.MetricHandler").Msg("error during saving metric")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -265,7 +265,7 @@ func (h *Handler) GetMetricValue(w http.ResponseWriter, r *http.Request) {
 	mType := chi.URLParam(r, "metricType")
 
 	// business logic + validation
-	metric, err := h.metricsService.Get(ctx, models.Metrics{ID: id, MType: mType})
+	metric, err := h.metricsService.Get(ctx, &models.Metrics{ID: id, MType: mType})
 
 	if err != nil {
 		switch {

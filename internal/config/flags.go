@@ -45,7 +45,6 @@ type NetAddress struct {
 //	-audit-url audit server endpoint
 func ParseServerFlags() (netAddress string, storeInterval int64, fileStoragePath string, restore bool, databaseDSN string, hashKey string, auditFilePath string, auditURL string) {
 	serverAddress := NetAddress{}
-	_ = flag.Value(&serverAddress)
 
 	flag.Var(&serverAddress, "a", "Net address host:port")
 	flag.Int64Var(&storeInterval, "i", defaultStoreInterval, "Store interval in seconds")
@@ -75,7 +74,6 @@ func ParseServerFlags() (netAddress string, storeInterval int64, fileStoragePath
 //	-l concurrency limit
 func ParseAgentFlags() (netAddress string, pollInterval int64, reportInterval int64, hashKey string, rateLimit int64) {
 	serverAddress := NetAddress{}
-	_ = flag.Value(&serverAddress)
 
 	flag.Var(&serverAddress, "a", "Net address host:port")
 	flag.Int64Var(&pollInterval, "p", defaultPollInterval, "Poll interval in seconds")

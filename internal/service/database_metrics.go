@@ -13,7 +13,7 @@ type DatabaseMetricsService struct {
 	log *zerolog.Logger
 }
 
-func (m *DatabaseMetricsService) Save(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
+func (m *DatabaseMetricsService) Save(ctx context.Context, metric *models.Metrics) (models.Metrics, error) {
 	return m.db.Save(ctx, metric)
 }
 
@@ -22,7 +22,7 @@ func (m *DatabaseMetricsService) SaveAll(ctx context.Context, metrics []models.M
 }
 
 // Get Возвращает метрику по имени и типу.// Получает данные из главного хранилища - Память или БД
-func (m *DatabaseMetricsService) Get(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
+func (m *DatabaseMetricsService) Get(ctx context.Context, metric *models.Metrics) (models.Metrics, error) {
 	return m.db.Get(ctx, metric)
 }
 

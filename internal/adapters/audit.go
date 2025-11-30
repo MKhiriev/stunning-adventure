@@ -3,6 +3,7 @@ package adapters
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/MKhiriev/stunning-adventure/internal/utils"
 	"github.com/MKhiriev/stunning-adventure/models"
@@ -24,7 +25,7 @@ func NewAuditAdapter(remoteServer string, logger *zerolog.Logger) AuditEventAdap
 	logger.Debug().Str("func", "adapters.NewAuditAdapter").Msg("audit adapter is initialized")
 	return &auditAdapter{
 		remoteServer: remoteServer,
-		client:       utils.NewHTTPClient(),
+		client:       utils.NewHTTPClient(5 * time.Second),
 		logger:       logger,
 	}
 }

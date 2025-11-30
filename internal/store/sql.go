@@ -72,7 +72,7 @@ func NewConnectPostgres(ctx context.Context, cfg *config.ServerConfig, log *zero
 	return db, nil
 }
 
-func (db *DB) Save(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
+func (db *DB) Save(ctx context.Context, metric *models.Metrics) (models.Metrics, error) {
 	var result models.Metrics
 	err := db.withRetry(ctx, "*DB.Save", func() error {
 		var saveErr error
@@ -90,7 +90,7 @@ func (db *DB) SaveAll(ctx context.Context, metrics []models.Metrics) error {
 	return err
 }
 
-func (db *DB) Get(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
+func (db *DB) Get(ctx context.Context, metric *models.Metrics) (models.Metrics, error) {
 	var foundMetric models.Metrics
 	err := db.withRetry(ctx, "*DB.Get", func() error {
 		var getErr error
@@ -151,7 +151,7 @@ func (db *DB) withRetry(ctx context.Context, operation string, fn func() error) 
 	return err
 }
 
-func (db *DB) saveMetric(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
+func (db *DB) saveMetric(ctx context.Context, metric *models.Metrics) (models.Metrics, error) {
 	if metric.MType == models.Gauge || metric.MType == models.Counter {
 		db.logger.Info().Str("func", "*DB.saveMetric").Str("metric name", metric.ID).Msg("trying to save metric")
 		// save metric in db
@@ -172,7 +172,7 @@ func (db *DB) saveMetric(ctx context.Context, metric models.Metrics) (models.Met
 	}
 
 	// return saved in db metric
-	return metric, nil
+	return *metric, nil
 }
 
 func (db *DB) saveAllMetrics(ctx context.Context, metrics []models.Metrics) error {
@@ -220,7 +220,7 @@ func (db *DB) saveAllMetrics(ctx context.Context, metrics []models.Metrics) erro
 	return tx.Commit()
 }
 
-func (db *DB) getMetric(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
+func (db *DB) getMetric(ctx context.Context, metric *models.Metrics) (models.Metrics, error) {
 	db.logger.Info().Str("func", "*DB.getMetric").Str("metric to find", metric.ID).Msg("trying to find metric")
 	// query row with given name and type
 	row := db.QueryRowContext(ctx, getMetric, metric.ID, metric.MType)
@@ -236,7 +236,7 @@ func (db *DB) getMetric(ctx context.Context, metric models.Metrics) (models.Metr
 		return models.Metrics{}, err
 	default:
 		db.logger.Info().Str("func", "*DB.getMetric").Str("found metric", metric.ID).Msg("metric IS found")
-		return metric, nil
+		return *metric, nil
 	}
 }
 

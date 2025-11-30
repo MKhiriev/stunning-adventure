@@ -19,7 +19,7 @@ func NewValidatingMetricsService() MetricsServiceWrapper {
 	}
 }
 
-func (v *ValidatingMetricsService) Save(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
+func (v *ValidatingMetricsService) Save(ctx context.Context, metric *models.Metrics) (models.Metrics, error) {
 	if err := v.validator.Validate(ctx, metric); err != nil {
 		return models.Metrics{}, fmt.Errorf("error during metric validation before saving: %w", err)
 	}
@@ -37,7 +37,7 @@ func (v *ValidatingMetricsService) SaveAll(ctx context.Context, metrics []models
 	return v.inner.SaveAll(ctx, metrics)
 }
 
-func (v *ValidatingMetricsService) Get(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
+func (v *ValidatingMetricsService) Get(ctx context.Context, metric *models.Metrics) (models.Metrics, error) {
 	if err := v.validator.Validate(ctx, metric, validators.ID, validators.MType); err != nil {
 		return models.Metrics{}, fmt.Errorf("error during metric validation before saving: %w", err)
 	}

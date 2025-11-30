@@ -68,3 +68,18 @@ go tool pprof -output=7_heap_db_conn.pprof localhost:8081/debug/pprof/heap
 go tool pprof -top -diff_base=6_cpu_logger.pprof 7_cpu_db_conn.pprof
 go tool pprof -top -diff_base=6_allocs_logger.pprof 7_allocs_db_conn.pprof
 go tool pprof -top -diff_base=6_heap_logger.pprof 7_heap_db_conn.pprof
+
+# eighth optimization
+go tool pprof -output=8_cpu_stack_alloc.pprof -seconds=25 localhost:8081/debug/pprof/profile
+go tool pprof -output=8_allocs_stack_alloc.pprof localhost:8081/debug/pprof/allocs
+go tool pprof -output=8_heap_stack_alloc.pprof localhost:8081/debug/pprof/heap
+
+go tool pprof -top -diff_base=7_cpu_db_conn.pprof 8_cpu_stack_alloc.pprof
+go tool pprof -top -diff_base=7_allocs_db_conn.pprof 8_allocs_stack_alloc.pprof
+go tool pprof -top -diff_base=7_heap_db_conn.pprof 8_heap_stack_alloc.pprof
+
+
+# result
+go tool pprof -top -diff_base=base_cpu.pprof 8_cpu_stack_alloc.pprof
+go tool pprof -top -diff_base=base_allocs.pprof 8_allocs_stack_alloc.pprof
+go tool pprof -top -diff_base=base_heap.pprof 8_heap_stack_alloc.pprof

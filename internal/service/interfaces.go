@@ -27,10 +27,10 @@ import (
 // MetricsService defines the fundamental operations for metric persistence
 // and retrieval. Implementations provide storage-backed behavior.
 type MetricsService interface {
-	Save(context.Context, models.Metrics) (models.Metrics, error) // persists a single metric and returns the stored value
-	SaveAll(context.Context, []models.Metrics) error              // persists a batch of metrics atomically where supported
-	Get(context.Context, models.Metrics) (models.Metrics, error)  // retrieves a specific metric by identifier
-	GetAll(context.Context) ([]models.Metrics, error)             // returns all stored metrics
+	Save(context.Context, *models.Metrics) (models.Metrics, error) // persists a single metric and returns the stored value
+	SaveAll(context.Context, []models.Metrics) error               // persists a batch of metrics atomically where supported
+	Get(context.Context, *models.Metrics) (models.Metrics, error)  // retrieves a specific metric by identifier
+	GetAll(context.Context) ([]models.Metrics, error)              // returns all stored metrics
 }
 
 // PingService defines the minimal health-check contract for storage or
