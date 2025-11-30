@@ -27,7 +27,7 @@ hey -m POST -n 2000 -c 50 -disable-compression \
 
 ## Allocations
 
-```json
+```
 > go tool pprof -diff_base=base_allocs.pprof result.pprof
 
 File: ___SERVER___DB___hashing
@@ -241,7 +241,7 @@ flat  flat%   sum%        cum   cum%
 
 ## heap
 
-```json
+```
 > go tool pprof -diff_base=base_heap.pprof 7_heap_db_conn.pprof
 
 File: ___SERVER___DB___hashing
