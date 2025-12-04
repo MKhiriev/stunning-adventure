@@ -1,6 +1,6 @@
 module github.com/MKhiriev/stunning-adventure
 
-go 1.25.1
+go 1.25.5
 
 require (
 	github.com/caarlos0/env/v11 v11.3.1
@@ -9,7 +9,7 @@ require (
 	github.com/jackc/pgerrcode v0.0.0-20250907135507-afb5586c32a6
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/rs/zerolog v1.34.0
-	github.com/shirou/gopsutil/v4 v4.25.10
+	github.com/shirou/gopsutil/v4 v4.25.11
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/tools v0.39.0
 )
