@@ -10,6 +10,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/MKhiriev/stunning-adventure/internal/adapters"
 	"github.com/MKhiriev/stunning-adventure/internal/config"
@@ -20,7 +21,14 @@ import (
 	"github.com/MKhiriev/stunning-adventure/internal/store"
 )
 
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
 func main() {
+	printBuildInfo()
 	ctx := context.Background()
 	log := logger.NewLogger("metrics-server")
 	cfg, err := config.GetServerConfigs()
@@ -64,4 +72,25 @@ func main() {
 	handler := handlers.NewHandler(metricsService, pingService, auditService, cfg, log)
 	myServer := new(server.Server)
 	myServer.ServerRun(handler.Init(), cfg)
+}
+
+func printBuildInfo() {
+	version := buildVersion
+	if version == "" {
+		version = "N/A"
+	}
+
+	date := buildDate
+	if date == "" {
+		date = "N/A"
+	}
+
+	commit := buildCommit
+	if commit == "" {
+		commit = "N/A"
+	}
+
+	fmt.Printf("Build version: %s\n", version)
+	fmt.Printf("Build date: %s\n", date)
+	fmt.Printf("Build commit: %s\n", commit)
 }
