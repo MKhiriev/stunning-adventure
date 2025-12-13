@@ -31,22 +31,19 @@ func main() {
 }
 
 func printBuildInfo() {
-	version := buildVersion
-	if version == "" {
-		version = "N/A"
+	if buildVersion == "" {
+		buildVersion = "N/A"
 	}
 
-	date := buildDate
-	if date == "" {
-		date = "N/A"
+	if buildDate == "" {
+		buildDate = "N/A"
 	}
 
-	commit := buildCommit
-	if commit == "" {
-		commit = "N/A"
+	if buildCommit == "" {
+		buildCommit = "N/A"
 	}
 
-	fmt.Printf("Build version: %s\n", version)
-	fmt.Printf("Build date: %s\n", date)
-	fmt.Printf("Build commit: %s\n", commit)
+	fmt.Printf("Build version: %s\n", buildVersion)
+	fmt.Printf("Build date: %s\n", buildDate)
+	fmt.Printf("Build commit: %s\n", buildCommit)
 }
