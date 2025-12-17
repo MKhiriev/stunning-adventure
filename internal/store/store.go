@@ -36,18 +36,18 @@ func (m *MemStorage) AddCounter(ctx context.Context, metrics *models.Metrics) (m
 		return models.Metrics{}, errors.New("metric type is not `counter`")
 	}
 
-	metricId := MetricID{ID: metrics.ID, MType: models.Counter}
-	val, ok := m.Memory[metricId]
+	metricID := MetricID{ID: metrics.ID, MType: models.Counter}
+	val, ok := m.Memory[metricID]
 	// if metric name exists in storage - apply Counter logic
 	if ok {
 		newDelta := *val.Delta + *metrics.Delta
 		val.Delta = &newDelta
 
-		m.Memory[metricId] = val
+		m.Memory[metricID] = val
 		result = val
 	} else {
 		// if metric name doesn't exist - add it
-		m.Memory[metricId] = *metrics
+		m.Memory[metricID] = *metrics
 		result = *metrics
 	}
 
@@ -64,16 +64,16 @@ func (m *MemStorage) UpdateGauge(ctx context.Context, metrics *models.Metrics) (
 		return models.Metrics{}, errors.New("metric type is not `gauge`")
 	}
 
-	metricId := MetricID{ID: metrics.ID, MType: models.Gauge}
-	val, ok := m.Memory[metricId]
+	metricID := MetricID{ID: metrics.ID, MType: models.Gauge}
+	val, ok := m.Memory[metricID]
 	// if metric name exists in storage - apply Gauge logic
 	if ok {
 		val.Value = metrics.Value
-		m.Memory[metricId] = val
+		m.Memory[metricID] = val
 		result = val
 	} else {
 		// if metric name doesn't exist - add it
-		m.Memory[metricId] = *metrics
+		m.Memory[metricID] = *metrics
 		result = *metrics
 	}
 
@@ -84,8 +84,8 @@ func (m *MemStorage) GetMetricByNameAndType(ctx context.Context, metricName stri
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	metricId := MetricID{ID: metricName, MType: metricType}
-	foundMetric, ok := m.Memory[metricId]
+	metricID := MetricID{ID: metricName, MType: metricType}
+	foundMetric, ok := m.Memory[metricID]
 	if ok {
 		if foundMetric.MType == metricType && hasValue(foundMetric) {
 			foundMetric.MType = metricType
