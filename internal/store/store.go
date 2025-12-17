@@ -12,13 +12,18 @@ import (
 )
 
 type MemStorage struct {
-	Memory map[string]models.Metrics `json:"metrics"`
+	Memory map[MetricID]models.Metrics `json:"metrics"`
 	mu     *sync.Mutex
 	log    *zerolog.Logger
 }
 
+type MetricID struct {
+	ID    string
+	MType string
+}
+
 func NewMemStorage(log *zerolog.Logger) *MemStorage {
-	return &MemStorage{Memory: make(map[string]models.Metrics), mu: &sync.Mutex{}, log: log}
+	return &MemStorage{Memory: make(map[MetricID]models.Metrics), mu: &sync.Mutex{}, log: log}
 }
 
 func (m *MemStorage) AddCounter(ctx context.Context, metrics *models.Metrics) (models.Metrics, error) {
@@ -31,17 +36,18 @@ func (m *MemStorage) AddCounter(ctx context.Context, metrics *models.Metrics) (m
 		return models.Metrics{}, errors.New("metric type is not `counter`")
 	}
 
-	val, ok := m.Memory[metrics.ID]
+	metricId := MetricID{ID: metrics.ID, MType: models.Counter}
+	val, ok := m.Memory[metricId]
 	// if metric name exists in storage - apply Counter logic
 	if ok {
 		newDelta := *val.Delta + *metrics.Delta
 		val.Delta = &newDelta
 
-		m.Memory[metrics.ID] = val
+		m.Memory[metricId] = val
 		result = val
 	} else {
 		// if metric name doesn't exist - add it
-		m.Memory[metrics.ID] = *metrics
+		m.Memory[metricId] = *metrics
 		result = *metrics
 	}
 
@@ -58,15 +64,16 @@ func (m *MemStorage) UpdateGauge(ctx context.Context, metrics *models.Metrics) (
 		return models.Metrics{}, errors.New("metric type is not `gauge`")
 	}
 
-	val, ok := m.Memory[metrics.ID]
+	metricId := MetricID{ID: metrics.ID, MType: models.Gauge}
+	val, ok := m.Memory[metricId]
 	// if metric name exists in storage - apply Gauge logic
 	if ok {
 		val.Value = metrics.Value
-		m.Memory[metrics.ID] = val
+		m.Memory[metricId] = val
 		result = val
 	} else {
 		// if metric name doesn't exist - add it
-		m.Memory[metrics.ID] = *metrics
+		m.Memory[metricId] = *metrics
 		result = *metrics
 	}
 
@@ -77,9 +84,11 @@ func (m *MemStorage) GetMetricByNameAndType(ctx context.Context, metricName stri
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	foundMetric, ok := m.Memory[metricName]
+	metricId := MetricID{ID: metricName, MType: metricType}
+	foundMetric, ok := m.Memory[metricId]
 	if ok {
-		if foundMetric.MType == metricType {
+		if foundMetric.MType == metricType && hasValue(foundMetric) {
+			foundMetric.MType = metricType
 			return foundMetric, nil
 		}
 		return models.Metrics{}, ErrNotFound
@@ -133,4 +142,19 @@ func (m *MemStorage) Get(ctx context.Context, metric *models.Metrics) (models.Me
 
 func (m *MemStorage) GetAll(ctx context.Context) ([]models.Metrics, error) {
 	return m.GetAllMetrics(ctx), nil
+}
+
+func hasValue(metric models.Metrics) bool {
+	switch metric.MType {
+	case models.Gauge:
+		if metric.Value != nil {
+			return true
+		}
+	case models.Counter:
+		if metric.Delta != nil {
+			return true
+		}
+	}
+
+	return false
 }
