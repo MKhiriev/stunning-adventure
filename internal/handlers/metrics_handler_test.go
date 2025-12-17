@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"crypto/rsa"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -157,7 +158,9 @@ func initHandler() *Handler {
 
 	auditService := service.NewAuditService(cfg.AuditFile, allAdapters.AuditEventAdapter, &logger)
 
-	return NewHandler(metricsService, dbPingService, auditService, cfg, &logger)
+	var privateKey *rsa.PrivateKey
+
+	return NewHandler(metricsService, dbPingService, auditService, privateKey, cfg, &logger)
 }
 
 func mDelta(v int) *int64 {

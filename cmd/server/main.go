@@ -10,6 +10,7 @@ package main
 
 import (
 	"context"
+	"crypto/rsa"
 	"fmt"
 
 	"github.com/MKhiriev/stunning-adventure/internal/adapters"
@@ -19,6 +20,7 @@ import (
 	"github.com/MKhiriev/stunning-adventure/internal/server"
 	"github.com/MKhiriev/stunning-adventure/internal/service"
 	"github.com/MKhiriev/stunning-adventure/internal/store"
+	"github.com/MKhiriev/stunning-adventure/internal/utils"
 )
 
 var (
@@ -69,7 +71,16 @@ func main() {
 	}
 	auditService := service.NewAuditService(cfg.AuditFile, allAdapters.AuditEventAdapter, log)
 
-	handler := handlers.NewHandler(metricsService, pingService, auditService, cfg, log)
+	var privateKey *rsa.PrivateKey
+	if cfg.PrivateCryptoKeyPath != "" {
+		privateKey, err = utils.GetPrivateKey(cfg.PrivateCryptoKeyPath)
+		if err != nil {
+			log.Err(err).Msg("error occurred getting private key")
+			return
+		}
+	}
+
+	handler := handlers.NewHandler(metricsService, pingService, auditService, privateKey, cfg, log)
 	myServer := new(server.Server)
 	myServer.ServerRun(handler.Init(), cfg)
 }
