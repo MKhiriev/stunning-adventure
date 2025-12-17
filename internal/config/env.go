@@ -20,6 +20,8 @@ type AgentConfig struct {
 	PollInterval   int64  `env:"POLL_INTERVAL"`   // interval in seconds to read metrics from system
 	HashKey        string `env:"KEY"`             // key used for hashing metric payloads
 	RateLimit      int64  `env:"RATE_LIMIT"`      // maximum number of requests per second
+
+	PublicCryptoKeyPath string `env:"CRYPTO_KEY"` // public key path for encryption of data for server
 }
 
 // ServerConfig
@@ -36,6 +38,8 @@ type ServerConfig struct {
 
 	AuditFile string `env:"AUDIT_FILE"` // local file path for audit logs
 	AuditURL  string `env:"AUDIT_URL"`  // external URL to send audit logs
+
+	PrivateCryptoKeyPath string `env:"CRYPTO_KEY"` // private key path for decryption of data from agent
 }
 
 // GetAgentConfigs
@@ -61,7 +65,9 @@ func GetAgentConfigs() *AgentConfig {
 	}
 
 	// else get command line args or default values
-	commandLineServerAddress, commandLinePollInterval, commandLineReportInterval, commandLineHashKey, commandLineRateLimit := ParseAgentFlags()
+	commandLineServerAddress, commandLinePollInterval,
+		commandLineReportInterval, commandLineHashKey,
+		commandLineRateLimit, commandLinePublicKeyFilePath := ParseAgentFlags()
 
 	if cfg.ServerAddress == "" {
 		cfg.ServerAddress = commandLineServerAddress
@@ -77,6 +83,9 @@ func GetAgentConfigs() *AgentConfig {
 	}
 	if cfg.RateLimit == 0 {
 		cfg.RateLimit = commandLineRateLimit
+	}
+	if cfg.PublicCryptoKeyPath == "" {
+		cfg.PublicCryptoKeyPath = commandLinePublicKeyFilePath
 	}
 
 	return cfg
@@ -109,7 +118,7 @@ func GetServerConfigs() (*ServerConfig, error) {
 	// else get command line args or default values
 	commandLineServerAddress, commandLineStoreInterval, commandLineFileStoragePath,
 		commandLineRestore, databaseDSN, commandLineHashKey,
-		commandLineAuditFilePath, commandLineAuditURL := ParseServerFlags()
+		commandLineAuditFilePath, commandLineAuditURL, commandLinePrivateKeyFilePath := ParseServerFlags()
 
 	if cfg.ServerAddress == "" {
 		cfg.ServerAddress = commandLineServerAddress
@@ -134,6 +143,9 @@ func GetServerConfigs() (*ServerConfig, error) {
 	}
 	if cfg.AuditURL == "" {
 		cfg.AuditURL = commandLineAuditURL
+	}
+	if cfg.PrivateCryptoKeyPath == "" {
+		cfg.PrivateCryptoKeyPath = commandLinePrivateKeyFilePath
 	}
 
 	return cfg, cfg.Validate()

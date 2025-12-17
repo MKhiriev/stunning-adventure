@@ -9,17 +9,19 @@ import (
 )
 
 const (
-	defaultPollInterval    = int64(2)
-	defaultReportInterval  = int64(5)
-	defaultServerAddress   = "localhost:8080"
-	defaultStoreInterval   = int64(300)
-	defaultFileStoragePath = ""
-	defaultRestoreValue    = false
-	defaultDatabaseDSN     = ""
-	defaultHashKey         = ""
-	defaultRateLimit       = int64(1)
-	defaultAuditFilePath   = ""
-	defaultAuditURL        = ""
+	defaultPollInterval       = int64(2)
+	defaultReportInterval     = int64(5)
+	defaultServerAddress      = "localhost:8080"
+	defaultStoreInterval      = int64(300)
+	defaultFileStoragePath    = ""
+	defaultRestoreValue       = false
+	defaultDatabaseDSN        = ""
+	defaultHashKey            = ""
+	defaultRateLimit          = int64(1)
+	defaultAuditFilePath      = ""
+	defaultAuditURL           = ""
+	defaultPublicKeyFilePath  = ""
+	defaultPrivateKeyFilePath = ""
 )
 
 // NetAddress holds structured network address data for host and port.
@@ -43,7 +45,8 @@ type NetAddress struct {
 //	-k hash key
 //	-audit-file path to audit log file
 //	-audit-url audit server endpoint
-func ParseServerFlags() (netAddress string, storeInterval int64, fileStoragePath string, restore bool, databaseDSN string, hashKey string, auditFilePath string, auditURL string) {
+//	-crypto-key public key path
+func ParseServerFlags() (netAddress string, storeInterval int64, fileStoragePath string, restore bool, databaseDSN string, hashKey string, auditFilePath string, auditURL string, privateKeyFilePath string) {
 	serverAddress := NetAddress{}
 
 	flag.Var(&serverAddress, "a", "Net address host:port")
@@ -56,9 +59,11 @@ func ParseServerFlags() (netAddress string, storeInterval int64, fileStoragePath
 	flag.StringVar(&auditFilePath, "audit-file", defaultAuditFilePath, "Audit file path string")
 	flag.StringVar(&auditURL, "audit-url", defaultAuditURL, "Full Audit URL string")
 
+	flag.StringVar(&privateKeyFilePath, "crypto-key", defaultPrivateKeyFilePath, "Private key file path")
+
 	flag.Parse()
 
-	return serverAddress.String(), storeInterval, fileStoragePath, restore, databaseDSN, hashKey, auditFilePath, auditURL
+	return
 }
 
 // ParseAgentFlags parses all agent-related configuration flags.
@@ -72,7 +77,8 @@ func ParseServerFlags() (netAddress string, storeInterval int64, fileStoragePath
 //	-r report interval in seconds
 //	-k hash key
 //	-l concurrency limit
-func ParseAgentFlags() (netAddress string, pollInterval int64, reportInterval int64, hashKey string, rateLimit int64) {
+//	-crypto-key public key path
+func ParseAgentFlags() (netAddress string, pollInterval int64, reportInterval int64, hashKey string, rateLimit int64, publicKeyFilePath string) {
 	serverAddress := NetAddress{}
 
 	flag.Var(&serverAddress, "a", "Net address host:port")
@@ -80,10 +86,11 @@ func ParseAgentFlags() (netAddress string, pollInterval int64, reportInterval in
 	flag.Int64Var(&reportInterval, "r", defaultReportInterval, "Report interval in seconds")
 	flag.StringVar(&hashKey, "k", defaultHashKey, "Hash key for hashing")
 	flag.Int64Var(&rateLimit, "l", defaultRateLimit, "Concurrent request limit to the server")
+	flag.StringVar(&publicKeyFilePath, "crypto-key", defaultPublicKeyFilePath, "Public key file path")
 
 	flag.Parse()
 
-	return serverAddress.String(), pollInterval, reportInterval, hashKey, rateLimit
+	return
 }
 
 // String returns a canonical host:port string for a NetAddress.
