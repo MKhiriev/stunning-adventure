@@ -12,7 +12,7 @@ func (h *Handler) WithDecryption(next http.Handler) http.Handler {
 		// read body
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			h.logger.Err(err).Str("func", "*Handler.WithDecryption").Msg("error reading http body")
+			h.logger.Err(err).Msg("error reading http body")
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
@@ -26,7 +26,7 @@ func (h *Handler) WithDecryption(next http.Handler) http.Handler {
 		// decrypt message
 		decryptedMessage, err := utils.DecryptData(body, h.privateKey)
 		if err != nil {
-			h.logger.Err(err).Str("func", "*Handler.WithDecryption").Msg("error decrypting http body")
+			h.logger.Err(err).Msg("error decrypting http body")
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
