@@ -63,6 +63,8 @@ func ParseServerFlags() (netAddress string, storeInterval int64, fileStoragePath
 
 	flag.Parse()
 
+	netAddress = serverAddress.String()
+
 	return
 }
 
@@ -89,6 +91,8 @@ func ParseAgentFlags() (netAddress string, pollInterval int64, reportInterval in
 	flag.StringVar(&publicKeyFilePath, "crypto-key", defaultPublicKeyFilePath, "Public key file path")
 
 	flag.Parse()
+
+	netAddress = serverAddress.String()
 
 	return
 }
