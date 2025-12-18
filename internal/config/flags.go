@@ -8,22 +8,6 @@ import (
 	"strings"
 )
 
-const (
-	defaultPollInterval       = int64(2)
-	defaultReportInterval     = int64(5)
-	defaultServerAddress      = "localhost:8080"
-	defaultStoreInterval      = int64(300)
-	defaultFileStoragePath    = ""
-	defaultRestoreValue       = false
-	defaultDatabaseDSN        = ""
-	defaultHashKey            = ""
-	defaultRateLimit          = int64(1)
-	defaultAuditFilePath      = ""
-	defaultAuditURL           = ""
-	defaultPublicKeyFilePath  = ""
-	defaultPrivateKeyFilePath = ""
-)
-
 // NetAddress holds structured network address data for host and port.
 // It implements the flag.Value interface.
 type NetAddress struct {
@@ -68,7 +52,7 @@ func ParseServerFlags() (netAddress string, storeInterval int64, fileStoragePath
 	return
 }
 
-// ParseAgentFlags parses all agent-related configuration flags.
+// parseAgentFlags parses all agent-related configuration flags.
 // It returns the resolved server address, poll interval, report interval,
 // hashing key, and request rate limit.
 //
@@ -80,28 +64,40 @@ func ParseServerFlags() (netAddress string, storeInterval int64, fileStoragePath
 //	-k hash key
 //	-l concurrency limit
 //	-crypto-key public key path
-func ParseAgentFlags() (netAddress string, pollInterval int64, reportInterval int64, hashKey string, rateLimit int64, publicKeyFilePath string) {
-	serverAddress := NetAddress{}
+func parseAgentFlags() *AgentConfig {
+	var hashKey, publicKeyFilePath string
+	var pollInterval, reportInterval, rateLimit int64
+	var serverAddress NetAddress
+	var jsonConfigFilePath string
 
-	flag.Var(&serverAddress, "a", "Net address host:port")
-	flag.Int64Var(&pollInterval, "p", defaultPollInterval, "Poll interval in seconds")
-	flag.Int64Var(&reportInterval, "r", defaultReportInterval, "Report interval in seconds")
-	flag.StringVar(&hashKey, "k", defaultHashKey, "Hash key for hashing")
-	flag.Int64Var(&rateLimit, "l", defaultRateLimit, "Concurrent request limit to the server")
-	flag.StringVar(&publicKeyFilePath, "crypto-key", defaultPublicKeyFilePath, "Public key file path")
+	flag.Var(&serverAddress, "a", "Net address \"host:port\" format")
+	flag.Int64Var(&pollInterval, "p", 0, "Poll interval in seconds")
+	flag.Int64Var(&reportInterval, "r", 0, "Report interval in seconds")
+	flag.StringVar(&hashKey, "k", "", "Hash key for hashing")
+	flag.Int64Var(&rateLimit, "l", 0, "Concurrent request limit to the server")
+	flag.StringVar(&publicKeyFilePath, "crypto-key", "", "Public key file path")
+
+	flag.StringVar(&jsonConfigFilePath, "config", "", "JSON config file path")
+	flag.StringVar(&jsonConfigFilePath, "c", "", "JSON config file path")
 
 	flag.Parse()
 
-	netAddress = serverAddress.String()
-
-	return
+	return &AgentConfig{
+		ServerAddress:       serverAddress.String(),
+		ReportInterval:      reportInterval,
+		PollInterval:        pollInterval,
+		HashKey:             hashKey,
+		RateLimit:           rateLimit,
+		PublicCryptoKeyPath: publicKeyFilePath,
+		JSONConfigFile:      jsonConfigFilePath,
+	}
 }
 
 // String returns a canonical host:port string for a NetAddress.
 // If neither Host nor Port are set, it returns the default server address.
 func (a *NetAddress) String() string {
 	if a.Host == "" && a.Port == 0 {
-		return defaultServerAddress
+		return ""
 	}
 
 	return a.Host + ":" + strconv.Itoa(a.Port)

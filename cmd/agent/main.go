@@ -23,8 +23,13 @@ var (
 
 func main() {
 	printBuildInfo()
-	cfg := config.GetAgentConfigs()
 	log := logger.NewLogger("metrics-agent")
+	cfg, err := config.GetAgentConfigs()
+	if err != nil {
+		log.Err(err).Msg("error getting configs")
+		return
+	}
+
 	log.Debug().Any("cfg-agent", cfg).Send()
 	log.Info().Msg("Agent started")
 
@@ -38,7 +43,7 @@ func main() {
 		}
 	}
 
-	err := agent.NewMetricsAgent("updates", publicKey, cfg, log).Run()
+	err = agent.NewMetricsAgent("updates", publicKey, cfg, log).Run()
 	log.Err(err).Caller().Str("func", "main").Msg("error occurred in agent during running")
 }
 
