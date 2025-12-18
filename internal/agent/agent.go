@@ -3,6 +3,7 @@ package agent
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,10 +36,11 @@ type MetricsAgent struct {
 	retryIntervals map[int]time.Duration // mapping retry attempt to delay
 	hasher         *utils.Hasher
 	rateLimit      int64
+	publicKey      *rsa.PublicKey // public key to encrypt message
 }
 
 // NewMetricsAgent initializes and returns a new MetricsAgent with configuration values.
-func NewMetricsAgent(route string, cfg *config.AgentConfig, logger *zerolog.Logger) *MetricsAgent {
+func NewMetricsAgent(route string, publicKey *rsa.PublicKey, cfg *config.AgentConfig, logger *zerolog.Logger) *MetricsAgent {
 	agent := &MetricsAgent{
 		serverAddress:  "http://" + cfg.ServerAddress,
 		route:          route,
@@ -56,6 +58,7 @@ func NewMetricsAgent(route string, cfg *config.AgentConfig, logger *zerolog.Logg
 		},
 		hasher:    utils.NewHasher(cfg.HashKey),
 		rateLimit: cfg.RateLimit,
+		publicKey: publicKey,
 	}
 
 	// add retry mechanism
@@ -182,7 +185,16 @@ func (m *MetricsAgent) sendMetrics(metric ...models.Metrics) error {
 		return compressionError
 	}
 
-	m.logger.Debug().Any("metric", metric).Any("hash", headers).Msg("")
+	if m.publicKey != nil {
+		encryptedMessage, err := utils.EncryptData(compressedMetric, m.publicKey)
+		if err != nil {
+			m.logger.Err(err).Str("func", "*MetricsAgent.sendMetrics").Msg("error encrypting data")
+			return err
+		}
+		compressedMetric = encryptedMessage.Bytes()
+	}
+
+	m.logger.Debug().Any("metric", metric).Any("hash", headers).Send()
 
 	var response models.Metrics
 	_, sendMetricError := m.client.R().
