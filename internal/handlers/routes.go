@@ -37,6 +37,7 @@ func NewHandler(metricsService service.MetricsService, dbPingService service.Pin
 
 	if privateKey != nil {
 		handler.privateKey = privateKey
+		logger.Info().Str("func", "NewHandler").Msg("private key added to the server!")
 	}
 
 	utils.InitHasherPool(cfg.HashKey)

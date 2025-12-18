@@ -1,11 +1,10 @@
 package handlers
 
 import (
-	"bytes"
-	"crypto/rand"
-	"crypto/rsa"
 	"io"
 	"net/http"
+
+	"github.com/MKhiriev/stunning-adventure/internal/utils"
 )
 
 func (h *Handler) WithDecryption(next http.Handler) http.Handler {
@@ -14,6 +13,7 @@ func (h *Handler) WithDecryption(next http.Handler) http.Handler {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			h.logger.Err(err).Str("func", "*Handler.WithDecryption").Msg("error reading http body")
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
 
@@ -24,13 +24,15 @@ func (h *Handler) WithDecryption(next http.Handler) http.Handler {
 		}
 
 		// decrypt message
-		decryptedMessage, err := rsa.DecryptPKCS1v15(rand.Reader, h.privateKey, body)
+		decryptedMessage, err := utils.DecryptData(body, h.privateKey)
 		if err != nil {
 			h.logger.Err(err).Str("func", "*Handler.WithDecryption").Msg("error decrypting http body")
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
 
-		r.Body = io.NopCloser(bytes.NewBuffer(decryptedMessage))
+		// set a decrypted data to the body
+		r.Body = io.NopCloser(decryptedMessage)
 
 		next.ServeHTTP(w, r)
 	})
