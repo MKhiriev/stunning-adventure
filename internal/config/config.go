@@ -1,24 +1,11 @@
 package config
 
-import (
-	"github.com/caarlos0/env/v11"
-)
-
 const (
-	defaultPollInterval       = int64(2)
-	defaultReportInterval     = int64(5)
-	defaultServerAddress      = "localhost:8080"
-	defaultRateLimit          = int64(1)
-	defaultStoreInterval      = int64(300)
-	defaultFileStoragePath    = ""
-	defaultRestoreValue       = false
-	defaultDatabaseDSN        = ""
-	defaultHashKey            = ""
-	defaultAuditFilePath      = ""
-	defaultAuditURL           = ""
-	defaultPublicKeyFilePath  = ""
-	defaultPrivateKeyFilePath = ""
-	defaultJSONConfigFilePath = ""
+	defaultPollInterval   = int64(2)
+	defaultReportInterval = int64(5)
+	defaultServerAddress  = "localhost:8080"
+	defaultRateLimit      = int64(1)
+	defaultStoreInterval  = int64(300)
 )
 
 // GetAgentConfigs
@@ -86,51 +73,45 @@ func GetAgentConfigs() (*AgentConfig, error) {
 //	*ServerConfig - fully populated server configuration struct
 //	error         - validation error if required fields are missing or invalid
 func GetServerConfigs() (*ServerConfig, error) {
-	cfg := &ServerConfig{}
-	err := env.Parse(cfg)
+	cfg := new(ServerConfig)
+
+	// 1. Get ENV configs
+	err := parseEnv(cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	// if all values are not nil return cfg
-	if cfg.ServerAddress != "" && cfg.StoreInterval != 0 {
+	// if ENV configs are not empty
+	if !cfg.isEmpty() {
 		return cfg, cfg.validate()
 	}
 
-	// else get command line args or default values
-	commandLineServerAddress, commandLineStoreInterval, commandLineFileStoragePath,
-		commandLineRestore, databaseDSN, commandLineHashKey,
-		commandLineAuditFilePath, commandLineAuditURL, commandLinePrivateKeyFilePath := ParseServerFlags()
+	// 2. Get CMD line configs
+	cmdCfg := ParseServerFlags()
 
-	if cfg.ServerAddress == "" {
-		cfg.ServerAddress = commandLineServerAddress
-	}
-	if cfg.StoreInterval == 0 {
-		cfg.StoreInterval = commandLineStoreInterval
-	}
-	if cfg.FileStoragePath == "" {
-		cfg.FileStoragePath = commandLineFileStoragePath
-	}
-	if !cfg.RestoreMetricsFromFile {
-		cfg.RestoreMetricsFromFile = commandLineRestore
-	}
-	if cfg.DatabaseDSN == "" {
-		cfg.DatabaseDSN = databaseDSN
-	}
-	if cfg.HashKey == "" {
-		cfg.HashKey = commandLineHashKey
-	}
-	if cfg.AuditFile == "" {
-		cfg.AuditFile = commandLineAuditFilePath
-	}
-	if cfg.AuditURL == "" {
-		cfg.AuditURL = commandLineAuditURL
-	}
-	if cfg.PrivateCryptoKeyPath == "" {
-		cfg.PrivateCryptoKeyPath = commandLinePrivateKeyFilePath
+	fillEmptyServerConfigParams(cfg, cmdCfg)
+
+	// if CMD configs are not empty
+	if !cfg.isEmpty() {
+		return cfg, nil
 	}
 
-	return cfg, cfg.validate()
+	// 3. Get JSON configs
+	if cfg.JSONConfigFile != "" {
+		jsonCfg, err := parseServerJSON(cfg.JSONConfigFile)
+		if err != nil {
+			return nil, err
+		}
+
+		fillEmptyServerConfigParams(cfg, jsonCfg)
+	}
+
+	// 4. Set defaults if empty
+	if cfg.isEmpty() {
+		cfg.setDefault()
+	}
+
+	return cfg, nil
 }
 
 func fillEmptyAgentConfigParams(to, from *AgentConfig) {
@@ -154,5 +135,35 @@ func fillEmptyAgentConfigParams(to, from *AgentConfig) {
 	}
 	if to.JSONConfigFile == "" {
 		to.JSONConfigFile = from.JSONConfigFile
+	}
+}
+
+func fillEmptyServerConfigParams(cfg, from *ServerConfig) {
+	if cfg.ServerAddress == "" {
+		cfg.ServerAddress = from.ServerAddress
+	}
+	if cfg.StoreInterval == 0 {
+		cfg.StoreInterval = from.StoreInterval
+	}
+	if cfg.FileStoragePath == "" {
+		cfg.FileStoragePath = from.FileStoragePath
+	}
+	if !cfg.RestoreMetricsFromFile {
+		cfg.RestoreMetricsFromFile = from.RestoreMetricsFromFile
+	}
+	if cfg.DatabaseDSN == "" {
+		cfg.DatabaseDSN = from.DatabaseDSN
+	}
+	if cfg.HashKey == "" {
+		cfg.HashKey = from.HashKey
+	}
+	if cfg.AuditFile == "" {
+		cfg.AuditFile = from.AuditFile
+	}
+	if cfg.AuditURL == "" {
+		cfg.AuditURL = from.AuditURL
+	}
+	if cfg.PrivateCryptoKeyPath == "" {
+		cfg.PrivateCryptoKeyPath = from.PrivateCryptoKeyPath
 	}
 }

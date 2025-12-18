@@ -30,26 +30,41 @@ type NetAddress struct {
 //	-audit-file path to audit log file
 //	-audit-url audit server endpoint
 //	-crypto-key public key path
-func ParseServerFlags() (netAddress string, storeInterval int64, fileStoragePath string, restore bool, databaseDSN string, hashKey string, auditFilePath string, auditURL string, privateKeyFilePath string) {
-	serverAddress := NetAddress{}
+//	-c/-config json file path with configs
+func ParseServerFlags() *ServerConfig {
+	var serverAddress NetAddress
+	var fileStoragePath, databaseDSN, hashKey, auditFilePath, auditURL, privateKeyFilePath string
+	var storeInterval int64
+	var restore bool
+	var jsonConfigFilePath string
 
 	flag.Var(&serverAddress, "a", "Net address host:port")
-	flag.Int64Var(&storeInterval, "i", defaultStoreInterval, "Store interval in seconds")
-	flag.StringVar(&fileStoragePath, "f", defaultFileStoragePath, "Storage file path string")
-	flag.BoolVar(&restore, "r", defaultRestoreValue, "Boolean - restore previous metrics from file")
-	flag.StringVar(&databaseDSN, "d", defaultDatabaseDSN, "Postgres database connection string")
-	flag.StringVar(&hashKey, "k", defaultHashKey, "Hash key for hashing")
+	flag.Int64Var(&storeInterval, "i", 0, "Store interval in seconds")
+	flag.StringVar(&fileStoragePath, "f", "", "Storage file path string")
+	flag.BoolVar(&restore, "r", false, "Boolean - restore previous metrics from file")
+	flag.StringVar(&databaseDSN, "d", "", "Postgres database connection string")
+	flag.StringVar(&hashKey, "k", "", "Hash key for hashing")
+	flag.StringVar(&auditFilePath, "audit-file", "", "Audit file path string")
+	flag.StringVar(&auditURL, "audit-url", "", "Full Audit URL string")
+	flag.StringVar(&privateKeyFilePath, "crypto-key", "", "Private key file path")
 
-	flag.StringVar(&auditFilePath, "audit-file", defaultAuditFilePath, "Audit file path string")
-	flag.StringVar(&auditURL, "audit-url", defaultAuditURL, "Full Audit URL string")
-
-	flag.StringVar(&privateKeyFilePath, "crypto-key", defaultPrivateKeyFilePath, "Private key file path")
+	flag.StringVar(&jsonConfigFilePath, "config", "", "JSON config file path")
+	flag.StringVar(&jsonConfigFilePath, "c", "", "JSON config file path")
 
 	flag.Parse()
 
-	netAddress = serverAddress.String()
-
-	return
+	return &ServerConfig{
+		ServerAddress:          serverAddress.String(),
+		StoreInterval:          storeInterval,
+		FileStoragePath:        fileStoragePath,
+		RestoreMetricsFromFile: restore,
+		DatabaseDSN:            databaseDSN,
+		HashKey:                hashKey,
+		AuditFile:              auditFilePath,
+		AuditURL:               auditURL,
+		PrivateCryptoKeyPath:   privateKeyFilePath,
+		JSONConfigFile:         jsonConfigFilePath,
+	}
 }
 
 // parseAgentFlags parses all agent-related configuration flags.
@@ -64,6 +79,7 @@ func ParseServerFlags() (netAddress string, storeInterval int64, fileStoragePath
 //	-k hash key
 //	-l concurrency limit
 //	-crypto-key public key path
+//	-c/-config json file path with configs
 func parseAgentFlags() *AgentConfig {
 	var hashKey, publicKeyFilePath string
 	var pollInterval, reportInterval, rateLimit int64

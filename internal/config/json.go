@@ -18,6 +18,19 @@ type agentJSONConfig struct {
 	PublicCryptoKeyPath string `json:"crypto_key"` // public key path for encryption of data for server
 }
 
+type serverJSONConfig struct {
+	ServerAddress string         `json:"address"`        // network address to bind the server
+	StoreInterval utils.Duration `json:"store_interval"` // interval in seconds to persist metrics to storage
+
+	FileStoragePath        string `json:"store_file"`   // file path for metric storage
+	RestoreMetricsFromFile bool   `json:"restore"`      // flag to restore metrics from file on startup
+	DatabaseDSN            string `json:"database_dsn"` // database connection string
+	HashKey                string `json:"hash_key"`     // key used for hashing metric payloads
+	AuditFile              string `json:"audit_file"`   // local file path for audit logs
+	AuditURL               string `json:"audit_url"`    // external URL to send audit logs
+	PrivateCryptoKeyPath   string `json:"crypto_key"`   // private key path for decryption of data from agent
+}
+
 func parseAgentJSON(jsonFilePath string) (*AgentConfig, error) {
 	jsonFile, err := os.Open(jsonFilePath)
 	if err != nil {
@@ -36,5 +49,29 @@ func parseAgentJSON(jsonFilePath string) (*AgentConfig, error) {
 		RateLimit:           jsonCfg.RateLimit,
 		HashKey:             jsonCfg.HashKey,
 		PublicCryptoKeyPath: jsonCfg.PublicCryptoKeyPath,
+	}, nil
+}
+
+func parseServerJSON(jsonFilePath string) (*ServerConfig, error) {
+	jsonFile, err := os.Open(jsonFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("error reading a json file: %w", err)
+	}
+
+	var jsonCfg serverJSONConfig
+	if err := json.NewDecoder(jsonFile).Decode(&jsonCfg); err != nil {
+		return nil, fmt.Errorf("error decoding json configs: %w", err)
+	}
+
+	return &ServerConfig{
+		ServerAddress:          jsonCfg.ServerAddress,
+		StoreInterval:          int64(jsonCfg.StoreInterval.Seconds()),
+		FileStoragePath:        jsonCfg.FileStoragePath,
+		RestoreMetricsFromFile: jsonCfg.RestoreMetricsFromFile,
+		DatabaseDSN:            jsonCfg.DatabaseDSN,
+		HashKey:                jsonCfg.HashKey,
+		AuditFile:              jsonCfg.AuditFile,
+		AuditURL:               jsonCfg.AuditURL,
+		PrivateCryptoKeyPath:   jsonCfg.PrivateCryptoKeyPath,
 	}, nil
 }
