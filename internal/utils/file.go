@@ -33,9 +33,11 @@ func CreateFile(filePath string) error {
 		return fmt.Errorf("error creating directory for file: %w", err)
 	}
 
-	if _, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0755); err != nil {
+	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0755)
+	if err != nil {
 		return fmt.Errorf("error creating file: %w", err)
 	}
+	defer f.Close()
 
 	return nil
 }
