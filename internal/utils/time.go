@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -22,4 +23,11 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 
 	d.Duration = parsed
 	return nil
+}
+
+func (d Duration) MarshalJSON() ([]byte, error) {
+	if d.Duration < 0 {
+		return nil, fmt.Errorf("duration must be > 0")
+	}
+	return json.Marshal(d.String())
 }

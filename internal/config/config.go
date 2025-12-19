@@ -1,5 +1,7 @@
 package config
 
+import "fmt"
+
 const (
 	defaultPollInterval   = int64(2)
 	defaultReportInterval = int64(5)
@@ -86,10 +88,16 @@ func GetServerConfigs() (*ServerConfig, error) {
 		return cfg, cfg.validate()
 	}
 
+	fmt.Printf("env %+v\n", cfg)
+
 	// 2. Get CMD line configs
 	cmdCfg := ParseServerFlags()
 
+	fmt.Printf("cmd %+v\n", cmdCfg)
+
 	fillEmptyServerConfigParams(cfg, cmdCfg)
+
+	fmt.Printf("after cmd+env => %+v\n", cfg)
 
 	// if CMD configs are not empty
 	if !cfg.isEmpty() {
@@ -138,32 +146,35 @@ func fillEmptyAgentConfigParams(to, from *AgentConfig) {
 	}
 }
 
-func fillEmptyServerConfigParams(cfg, from *ServerConfig) {
-	if cfg.ServerAddress == "" {
-		cfg.ServerAddress = from.ServerAddress
+func fillEmptyServerConfigParams(to, from *ServerConfig) {
+	if to.ServerAddress == "" {
+		to.ServerAddress = from.ServerAddress
 	}
-	if cfg.StoreInterval == 0 {
-		cfg.StoreInterval = from.StoreInterval
+	if to.StoreInterval == 0 {
+		to.StoreInterval = from.StoreInterval
 	}
-	if cfg.FileStoragePath == "" {
-		cfg.FileStoragePath = from.FileStoragePath
+	if to.FileStoragePath == "" {
+		to.FileStoragePath = from.FileStoragePath
 	}
-	if !cfg.RestoreMetricsFromFile {
-		cfg.RestoreMetricsFromFile = from.RestoreMetricsFromFile
+	if !to.RestoreMetricsFromFile {
+		to.RestoreMetricsFromFile = from.RestoreMetricsFromFile
 	}
-	if cfg.DatabaseDSN == "" {
-		cfg.DatabaseDSN = from.DatabaseDSN
+	if to.DatabaseDSN == "" {
+		to.DatabaseDSN = from.DatabaseDSN
 	}
-	if cfg.HashKey == "" {
-		cfg.HashKey = from.HashKey
+	if to.HashKey == "" {
+		to.HashKey = from.HashKey
 	}
-	if cfg.AuditFile == "" {
-		cfg.AuditFile = from.AuditFile
+	if to.AuditFile == "" {
+		to.AuditFile = from.AuditFile
 	}
-	if cfg.AuditURL == "" {
-		cfg.AuditURL = from.AuditURL
+	if to.AuditURL == "" {
+		to.AuditURL = from.AuditURL
 	}
-	if cfg.PrivateCryptoKeyPath == "" {
-		cfg.PrivateCryptoKeyPath = from.PrivateCryptoKeyPath
+	if to.PrivateCryptoKeyPath == "" {
+		to.PrivateCryptoKeyPath = from.PrivateCryptoKeyPath
+	}
+	if to.JSONConfigFile == "" {
+		to.JSONConfigFile = from.JSONConfigFile
 	}
 }
