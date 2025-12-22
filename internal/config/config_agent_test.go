@@ -1,6 +1,8 @@
 package config
 
 import (
+	"flag"
+	"os"
 	"testing"
 )
 
@@ -70,4 +72,157 @@ func TestAgentConfigIsEmpty(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAgentConfig_JSON_NotUsed_WhenNotSpecified(t *testing.T) {
+	resetFlags()
+	clearEnv(t, "CONFIG")
+
+	builder := newAgentConfigBuilder().
+		withEnv().
+		withFlags().
+		withJSON().
+		withDefaults()
+
+	cfg, err := builder.build()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.ServerAddress != defaultServerAddress {
+		t.Fatalf("expected default address, got %s", cfg.ServerAddress)
+	}
+}
+
+func TestAgentConfig_JSON_Used_WhenFlagSpecified(t *testing.T) {
+	file := writeTempJSON(t, `{
+		"address": "127.0.25.123:8080",
+		"poll_interval": "10s",
+		"report_interval": "20s",
+		"rate_limit": 5
+	}`)
+
+	resetFlags("-c", file)
+	clearEnv(t, "CONFIG")
+
+	builder := newAgentConfigBuilder().
+		withEnv().
+		withFlags().
+		withJSON().
+		withDefaults()
+
+	cfg, err := builder.build()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.ServerAddress != "127.0.25.123:8080" {
+		t.Fatalf("expected json address, got %s", cfg.ServerAddress)
+	}
+}
+
+func TestAgentConfig_FlagsOverrideJSON(t *testing.T) {
+	file := writeTempJSON(t, `{
+		"address": "json:8080",
+		"poll_interval": "10s"
+	}`)
+
+	resetFlags(
+		"-c", file,
+		"-a", "127.0.25.123:9090",
+		"-p", "3",
+	)
+	clearEnv(t, "CONFIG")
+
+	builder := newAgentConfigBuilder().
+		withEnv().
+		withFlags().
+		withJSON().
+		withDefaults()
+
+	cfg, err := builder.build()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.ServerAddress != "127.0.25.123:9090" {
+		t.Fatalf("flag should override json")
+	}
+
+	if cfg.PollInterval != 3 {
+		t.Fatalf("flag poll_interval should override json")
+	}
+}
+
+func TestAgentConfig_EnvOverridesEverything(t *testing.T) {
+	file := writeTempJSON(t, `{
+		"address": "127.0.0.3:9090"
+	}`)
+
+	resetFlags("-c", file, "-a", "127.0.0.3:9090")
+
+	t.Setenv("ADDRESS", "127.0.0.2:7070")
+
+	builder := newAgentConfigBuilder().
+		withEnv().
+		withFlags().
+		withJSON().
+		withDefaults()
+
+	cfg, err := builder.build()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.ServerAddress != "127.0.0.2:7070" {
+		t.Fatalf("env should override all, got %s", cfg.ServerAddress)
+	}
+}
+
+func TestAgentConfig_DefaultsApplied(t *testing.T) {
+	resetFlags()
+	clearEnv(t, "ADDRESS", "CONFIG")
+
+	builder := newAgentConfigBuilder().
+		withEnv().
+		withFlags().
+		withJSON().
+		withDefaults()
+
+	cfg, err := builder.build()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.PollInterval != defaultPollInterval {
+		t.Fatalf("default poll interval not applied")
+	}
+}
+
+func resetFlags(args ...string) {
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	os.Args = append([]string{os.Args[0]}, args...)
+}
+
+func clearEnv(t *testing.T, keys ...string) {
+	for _, k := range keys {
+		t.Helper()
+		_ = os.Unsetenv(k)
+	}
+}
+
+func writeTempJSON(t *testing.T, content string) string {
+	t.Helper()
+
+	f, err := os.CreateTemp("", "cfg-*.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := f.WriteString(content); err != nil {
+		t.Fatal(err)
+	}
+
+	_ = f.Close()
+	return f.Name()
 }

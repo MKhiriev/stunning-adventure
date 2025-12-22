@@ -85,3 +85,178 @@ func TestServerConfigIsEmpty(t *testing.T) {
 		})
 	}
 }
+
+func TestServerConfig_DefaultsApplied(t *testing.T) {
+	resetFlags()
+	clearEnv(t, "ADDRESS", "STORE_INTERVAL", "CONFIG")
+
+	cfg, err := GetServerConfigs()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.ServerAddress != defaultServerAddress {
+		t.Fatalf("expected default address, got %s", cfg.ServerAddress)
+	}
+
+	if cfg.StoreInterval != defaultStoreInterval {
+		t.Fatalf("expected default store interval, got %d", cfg.StoreInterval)
+	}
+}
+
+func TestServerConfig_JSONUsed_WhenFlagSpecified(t *testing.T) {
+	file := writeTempJSON(t, `{
+		"address": "json:8080",
+		"store_interval": "10s"
+	}`)
+
+	resetFlags("-c", file)
+	clearEnv(t, "CONFIG")
+
+	cfg, err := newServerConfigBuilder().
+		withEnv().
+		withFlags().
+		withJSON().
+		withDefaults().
+		build()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.ServerAddress != "json:8080" {
+		t.Fatalf("expected json address, got %s", cfg.ServerAddress)
+	}
+
+	if cfg.StoreInterval != 10 {
+		t.Fatalf("expected json store interval, got %d", cfg.StoreInterval)
+	}
+}
+
+func TestServerConfig_FlagsOverrideJSON(t *testing.T) {
+	file := writeTempJSON(t, `{
+		"address": "127.0.0.1:8080",
+		"store_interval": "10s"
+	}`)
+
+	resetFlags(
+		"-c", file,
+		"-a", "127.0.0.1:9090",
+		"-i", "3",
+	)
+	clearEnv(t, "CONFIG")
+
+	cfg, err := newServerConfigBuilder().
+		withEnv().
+		withFlags().
+		withJSON().
+		withDefaults().
+		build()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.ServerAddress != "127.0.0.1:9090" {
+		t.Fatalf("flag should override json, got %s", cfg.ServerAddress)
+	}
+
+	if cfg.StoreInterval != 3 {
+		t.Fatalf("flag store_interval should override json")
+	}
+}
+
+func TestServerConfig_EnvOverridesAll(t *testing.T) {
+	file := writeTempJSON(t, `{
+		"address": "127.0.0.1:8080",
+		"store_interval": "10s"
+	}`)
+
+	resetFlags(
+		"-c", file,
+		"-a", "127.0.0.1:9090",
+		"-i", "3",
+	)
+
+	t.Setenv("ADDRESS", "127.0.0.1:7070")
+	t.Setenv("STORE_INTERVAL", "20")
+
+	cfg, err := newServerConfigBuilder().
+		withEnv().
+		withFlags().
+		withJSON().
+		withDefaults().
+		build()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.ServerAddress != "127.0.0.1:7070" {
+		t.Fatalf("env should override all, got %s", cfg.ServerAddress)
+	}
+
+	if cfg.StoreInterval != 20 {
+		t.Fatalf("env should override all store interval")
+	}
+}
+
+func TestServerConfig_JSONFromEnvCONFIG(t *testing.T) {
+	file := writeTempJSON(t, `{
+		"address": "127.0.0.1:8080",
+		"store_interval": "15s"
+	}`)
+
+	resetFlags()
+	t.Setenv("CONFIG", file)
+
+	cfg, err := newServerConfigBuilder().
+		withEnv().
+		withFlags().
+		withJSON().
+		withDefaults().
+		build()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.ServerAddress != "127.0.0.1:8080" {
+		t.Fatalf("expected json address from env")
+	}
+}
+
+func TestServerConfig_InvalidJSON_ReturnsError(t *testing.T) {
+	file := writeTempJSON(t, `{ invalid json`)
+
+	resetFlags("-c", file)
+	clearEnv(t, "CONFIG")
+
+	_, err := newServerConfigBuilder().
+		withEnv().
+		withFlags().
+		withJSON().
+		withDefaults().
+		build()
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+}
+
+func TestServerConfig_ValidationFails(t *testing.T) {
+	file := writeTempJSON(t, `{
+		"store_interval": "10s"
+	}`)
+
+	resetFlags("-c", file)
+	clearEnv(t, "CONFIG")
+
+	cfg, err := newServerConfigBuilder().
+		withEnv().
+		withFlags().
+		withJSON().
+		withDefaults().
+		build()
+	if err != nil {
+		t.Fatalf("expected validation error")
+	}
+	if cfg.StoreInterval != 10 {
+		t.Fatalf("expected store interval %v from JSON", 10)
+	}
+}

@@ -1,6 +1,11 @@
 package config
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+
+	"dario.cat/mergo"
+)
 
 // ServerConfig
 //
@@ -18,6 +23,84 @@ type ServerConfig struct {
 	AuditURL               string `env:"AUDIT_URL"`         // external URL to send audit logs
 	PrivateCryptoKeyPath   string `env:"CRYPTO_KEY"`        // private key path for decryption of data from agent
 	JSONConfigFile         string `env:"CONFIG"`            // json file path with configs
+}
+
+type serverConfigBuilder struct {
+	configs []*ServerConfig
+	err     error
+}
+
+func newServerConfigBuilder() *serverConfigBuilder {
+	return &serverConfigBuilder{
+		configs: make([]*ServerConfig, 0, 4),
+	}
+}
+
+func (b *serverConfigBuilder) build() (*ServerConfig, error) {
+	if b.err != nil {
+		return nil, fmt.Errorf("error occured during building config: %w", b.err)
+	}
+
+	serverConfig := new(ServerConfig)
+	for _, cfg := range b.configs {
+		if err := mergo.Merge(serverConfig, cfg); err != nil {
+			return nil, fmt.Errorf("error merging configs: %w", err)
+		}
+	}
+
+	return serverConfig, serverConfig.validate()
+}
+
+func (b *serverConfigBuilder) withDefaults() *serverConfigBuilder {
+	defaultConfig := &ServerConfig{
+		ServerAddress: defaultServerAddress,
+		StoreInterval: defaultStoreInterval,
+	}
+
+	b.configs = append(b.configs, defaultConfig)
+	return b
+}
+
+func (b *serverConfigBuilder) withJSON() *serverConfigBuilder {
+	var jsonPath string
+	isJSONSpecified := false
+
+	for _, cfg := range b.configs {
+		if cfg.JSONConfigFile != "" {
+			isJSONSpecified = true
+			jsonPath = cfg.JSONConfigFile
+		}
+	}
+
+	if isJSONSpecified {
+		jsonCfg, err := parseServerJSON(jsonPath)
+		if err != nil {
+			b.err = errors.Join(b.err, err)
+			return b
+		}
+		b.configs = append(b.configs, jsonCfg)
+	}
+
+	return b
+}
+
+func (b *serverConfigBuilder) withFlags() *serverConfigBuilder {
+	flags := ParseServerFlags()
+
+	b.configs = append(b.configs, flags)
+	return b
+}
+
+func (b *serverConfigBuilder) withEnv() *serverConfigBuilder {
+	envCfg := &ServerConfig{}
+	if err := parseEnv(envCfg); err != nil {
+		b.err = errors.Join(b.err, err)
+		return b
+	}
+
+	b.configs = append(b.configs, envCfg)
+
+	return b
 }
 
 // validate
