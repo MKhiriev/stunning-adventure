@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -27,11 +26,15 @@ func (s *Server) ServerRun(handler http.Handler, cfg *config.ServerConfig) error
 	}
 
 	idleConnsClosed := make(chan struct{})
-	sigint := make(chan os.Signal, 1)
-	signal.Notify(sigint, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
-
+	ctx, stop := signal.NotifyContext(
+		context.Background(),
+		syscall.SIGTERM,
+		syscall.SIGINT,
+		syscall.SIGQUIT,
+	)
+	defer stop()
 	go func() {
-		<-sigint
+		<-ctx.Done()
 
 		if err := s.server.Shutdown(context.Background()); err != nil {
 			// ошибки закрытия Listener

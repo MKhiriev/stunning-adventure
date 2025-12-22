@@ -1,7 +1,5 @@
 package config
 
-import "fmt"
-
 const (
 	defaultPollInterval   = int64(2)
 	defaultReportInterval = int64(5)
@@ -88,16 +86,10 @@ func GetServerConfigs() (*ServerConfig, error) {
 		return cfg, cfg.validate()
 	}
 
-	fmt.Printf("env %+v\n", cfg)
-
 	// 2. Get CMD line configs
 	cmdCfg := ParseServerFlags()
 
-	fmt.Printf("cmd %+v\n", cmdCfg)
-
 	fillEmptyServerConfigParams(cfg, cmdCfg)
-
-	fmt.Printf("after cmd+env => %+v\n", cfg)
 
 	// if CMD configs are not empty
 	if !cfg.isEmpty() {

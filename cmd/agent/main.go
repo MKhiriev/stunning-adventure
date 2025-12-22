@@ -26,8 +26,7 @@ func main() {
 	log := logger.NewLogger("metrics-agent")
 	cfg, err := config.GetAgentConfigs()
 	if err != nil {
-		log.Err(err).Msg("error getting configs")
-		return
+		log.Fatal().Msg("error getting configs")
 	}
 
 	log.Debug().Any("cfg-agent", cfg).Send()
