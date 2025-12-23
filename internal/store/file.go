@@ -55,9 +55,6 @@ func NewFileStorage(ctx context.Context, memStorage *MemStorage, cfg *config.Ser
 }
 
 func (fs *FileStorage) SaveMetricsToFile(ctx context.Context, allMetrics []models.Metrics) error {
-	fs.memStorage.mu.Lock()
-	defer fs.memStorage.mu.Unlock()
-
 	jsonData, err := json.Marshal(allMetrics)
 	if err != nil {
 		fs.log.Err(err).Str("func", "*FileStorage.SaveMetricsToFile").Msg("error marshalling metric to JSON")
@@ -68,9 +65,6 @@ func (fs *FileStorage) SaveMetricsToFile(ctx context.Context, allMetrics []model
 }
 
 func (fs *FileStorage) LoadMetricsFromFile(context.Context) ([]models.Metrics, error) {
-	fs.memStorage.mu.Lock()
-	defer fs.memStorage.mu.Unlock()
-
 	// open existing file or create new
 	file, err := os.OpenFile(fs.fullFileName, os.O_RDONLY|os.O_CREATE, 0644)
 	if err != nil {
@@ -112,9 +106,6 @@ func (fs *FileStorage) LoadMetricsFromFile(context.Context) ([]models.Metrics, e
 }
 
 func (fs *FileStorage) Save(ctx context.Context, metric *models.Metrics) (models.Metrics, error) {
-	fs.memStorage.mu.Lock()
-	defer fs.memStorage.mu.Unlock()
-
 	// save metric to file
 	fs.memStorage.Memory[MetricID{metric.ID, metric.MType}] = *metric
 	if err := fs.SaveMetricsToFile(ctx, fs.memStorage.GetAllMetrics(ctx)); err != nil {

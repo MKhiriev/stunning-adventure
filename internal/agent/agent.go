@@ -3,14 +3,18 @@ package agent
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
+	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"os/signal"
 	"runtime"
 	"strconv"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/MKhiriev/stunning-adventure/internal/config"
@@ -35,10 +39,11 @@ type MetricsAgent struct {
 	retryIntervals map[int]time.Duration // mapping retry attempt to delay
 	hasher         *utils.Hasher
 	rateLimit      int64
+	publicKey      *rsa.PublicKey // public key to encrypt message
 }
 
 // NewMetricsAgent initializes and returns a new MetricsAgent with configuration values.
-func NewMetricsAgent(route string, cfg *config.AgentConfig, logger *zerolog.Logger) *MetricsAgent {
+func NewMetricsAgent(route string, publicKey *rsa.PublicKey, cfg *config.AgentConfig, logger *zerolog.Logger) *MetricsAgent {
 	agent := &MetricsAgent{
 		serverAddress:  "http://" + cfg.ServerAddress,
 		route:          route,
@@ -56,6 +61,7 @@ func NewMetricsAgent(route string, cfg *config.AgentConfig, logger *zerolog.Logg
 		},
 		hasher:    utils.NewHasher(cfg.HashKey),
 		rateLimit: cfg.RateLimit,
+		publicKey: publicKey,
 	}
 
 	// add retry mechanism
@@ -182,7 +188,16 @@ func (m *MetricsAgent) sendMetrics(metric ...models.Metrics) error {
 		return compressionError
 	}
 
-	m.logger.Debug().Any("metric", metric).Any("hash", headers).Msg("")
+	if m.publicKey != nil {
+		encryptedMessage, err := utils.EncryptData(compressedMetric, m.publicKey)
+		if err != nil {
+			m.logger.Err(err).Str("func", "*MetricsAgent.sendMetrics").Msg("error encrypting data")
+			return err
+		}
+		compressedMetric = encryptedMessage.Bytes()
+	}
+
+	m.logger.Debug().Any("metric", metric).Any("hash", headers).Send()
 
 	var response models.Metrics
 	_, sendMetricError := m.client.R().
@@ -238,12 +253,16 @@ func (m *MetricsAgent) SendMetrics() error {
 }
 
 // ReadMetricsGenerator reads metrics and returns a channel that will feed the worker metrics for sending
-func (m *MetricsAgent) ReadMetricsGenerator(pollInterval *time.Ticker, reportInterval *time.Ticker) chan []models.Metrics {
+func (m *MetricsAgent) ReadMetricsGenerator(ctx context.Context, pollInterval *time.Ticker, reportInterval *time.Ticker) chan []models.Metrics {
 	metricsChannel := make(chan []models.Metrics)
 
 	go func() {
+		defer close(metricsChannel)
 		for {
 			select {
+			case <-ctx.Done():
+				m.logger.Debug().Msg("read metrics job generator stopped")
+				return
 			case <-pollInterval.C:
 				m.logger.Debug().Str("func", "ReadMetricsGenerator").Msg("time to READ metrics")
 				_ = m.ReadMetrics()
@@ -265,32 +284,59 @@ func (m *MetricsAgent) SendMetricsWorker(metricBatches <-chan []models.Metrics) 
 		_ = m.sendMetrics(batch...)
 		m.pollCount = 0
 	}
+	m.logger.Debug().Msg("worker stopped working")
 }
 
 // Run starts the MetricsAgent lifecycle, including reading metrics and sending
 // them with worker goroutines.
 func (m *MetricsAgent) Run() error {
+	// creating ctx to end jobs generator and sender workers
+	ctx, stop := signal.NotifyContext(
+		context.Background(),
+		syscall.SIGTERM,
+		syscall.SIGINT,
+		syscall.SIGQUIT,
+	)
+	defer stop()
+
 	// reading metrics part
 	pollTicker, reportTicker := getTickers(time.Duration(m.pollInterval)*time.Second, time.Duration(m.reportInterval)*time.Second)
 	m.logger.Debug().Str("func", "Run").Msg("preparing to run goroutine for reading metrics")
-	jobs := m.ReadMetricsGenerator(pollTicker, reportTicker)
+	jobs := m.ReadMetricsGenerator(ctx, pollTicker, reportTicker)
+
+	// creating wait groups to cancel workers after finishing
+	wg := new(sync.WaitGroup)
 
 	// creating workers
 	m.logger.Debug().Str("func", "Run").Msg("creating workers")
-	m.withWorkers(func() {
+	m.withWorkers(wg, func() {
+		defer wg.Done() // runs only when jobs channel is closed
 		m.SendMetricsWorker(jobs)
 	}, m.rateLimit)
 	m.logger.Debug().Str("func", "Run").Msg("workers are created")
 
-	select {} // block main routine forever
+	// wait for the shutdown signal
+	<-ctx.Done()
+	m.logger.Info().Msg("shutdown signal received")
+
+	// stop all the tickers
+	pollTicker.Stop()
+	reportTicker.Stop()
+
+	// wait till all the workers are finished
+	wg.Wait()
+
+	m.logger.Info().Msg("agent shutdown completed")
+	return nil
 }
 
 func getTickers(pollIntervalDuration time.Duration, reportIntervalDuration time.Duration) (*time.Ticker, *time.Ticker) {
 	return time.NewTicker(pollIntervalDuration), time.NewTicker(reportIntervalDuration)
 }
 
-func (m *MetricsAgent) withWorkers(fn func(), count int64) {
+func (m *MetricsAgent) withWorkers(wg *sync.WaitGroup, fn func(), count int64) {
 	for i := range count {
+		wg.Add(1)
 		m.logger.Debug().Str("func", "withWorkers").Msgf("creating worker #%d", i)
 		go fn()
 		m.logger.Debug().Msgf("worker#%d is created", i)

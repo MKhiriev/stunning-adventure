@@ -6,11 +6,13 @@
 package main
 
 import (
+	"crypto/rsa"
 	"fmt"
 
 	"github.com/MKhiriev/stunning-adventure/internal/agent"
 	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/internal/logger"
+	"github.com/MKhiriev/stunning-adventure/internal/utils"
 )
 
 var (
@@ -21,12 +23,26 @@ var (
 
 func main() {
 	printBuildInfo()
-	cfg := config.GetAgentConfigs()
 	log := logger.NewLogger("metrics-agent")
+	cfg, err := config.GetAgentConfigs()
+	if err != nil {
+		log.Fatal().Msg("error getting configs")
+	}
+
 	log.Debug().Any("cfg-agent", cfg).Send()
 	log.Info().Msg("Agent started")
 
-	err := agent.NewMetricsAgent("updates", cfg, log).Run()
+	var publicKey *rsa.PublicKey
+	if cfg.PublicCryptoKeyPath != "" {
+		var err error
+		publicKey, err = utils.GetPublicKey(cfg.PublicCryptoKeyPath)
+		if err != nil {
+			log.Err(err).Msg("error getting public key")
+			return
+		}
+	}
+
+	err = agent.NewMetricsAgent("updates", publicKey, cfg, log).Run()
 	log.Err(err).Caller().Str("func", "main").Msg("error occurred in agent during running")
 }
 

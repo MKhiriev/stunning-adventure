@@ -98,9 +98,6 @@ func (m *MemStorage) GetMetricByNameAndType(ctx context.Context, metricName stri
 }
 
 func (m *MemStorage) GetAllMetrics(ctx context.Context) []models.Metrics {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	return slices.Collect(maps.Values(m.Memory))
 }
 

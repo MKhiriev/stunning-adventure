@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"crypto/rsa"
+
 	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/internal/service"
 	"github.com/MKhiriev/stunning-adventure/internal/utils"
@@ -18,12 +20,12 @@ type Handler struct {
 
 	metricValidator validators.Validator
 	hashKey         string
+
+	privateKey *rsa.PrivateKey // key for decrypting messages
 }
 
-func NewHandler(metricsService service.MetricsService, dbPingService service.PingService, auditService service.AuditPublisher, cfg *config.ServerConfig, logger *zerolog.Logger) *Handler {
-	utils.InitHasherPool(cfg.HashKey)
-
-	return &Handler{
+func NewHandler(metricsService service.MetricsService, dbPingService service.PingService, auditService service.AuditPublisher, privateKey *rsa.PrivateKey, cfg *config.ServerConfig, logger *zerolog.Logger) *Handler {
+	handler := &Handler{
 		logger:         logger,
 		metricsService: metricsService,
 		dbPingService:  dbPingService,
@@ -32,11 +34,24 @@ func NewHandler(metricsService service.MetricsService, dbPingService service.Pin
 		metricValidator: validators.NewMetricsValidator(),
 		hashKey:         cfg.HashKey,
 	}
+
+	if privateKey != nil {
+		handler.privateKey = privateKey
+		logger.Info().Str("func", "NewHandler").Msg("private key added to the server!")
+	}
+
+	utils.InitHasherPool(cfg.HashKey)
+
+	return handler
 }
 
 func (h *Handler) Init() *chi.Mux {
 	router := chi.NewRouter()
-	router.Use(middleware.Recoverer, h.WithLogging)
+	router.Use(middleware.Recoverer)
+	router.Use(h.WithLogging)
+	if h.privateKey != nil {
+		router.Use(h.WithDecryption)
+	}
 
 	router.Mount("/debug", middleware.Profiler())
 

@@ -147,7 +147,7 @@ func initAgent() *MetricsAgent {
 		ReportInterval: 2,
 		PollInterval:   1,
 	}
-	return NewMetricsAgent("update", cfg, &zerolog.Logger{})
+	return NewMetricsAgent("update", nil, cfg, &zerolog.Logger{})
 }
 
 func mDelta(v int) *int64 {
