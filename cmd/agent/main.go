@@ -37,13 +37,17 @@ func main() {
 		var err error
 		publicKey, err = utils.GetPublicKey(cfg.PublicCryptoKeyPath)
 		if err != nil {
-			log.Err(err).Msg("error getting public key")
-			return
+			log.Fatal().Err(err).Msg("error getting public key")
 		}
 	}
 
-	err = agent.NewMetricsAgent("updates", publicKey, cfg, log).Run()
-	log.Err(err).Caller().Str("func", "main").Msg("error occurred in agent during running")
+	metricsAgent, err := agent.NewMetricsAgent("updates", publicKey, cfg, log)
+	if err != nil {
+		log.Fatal().Err(err).Msg("error creating metrics agent")
+	}
+
+	err = metricsAgent.Run()
+	log.Err(err).Msg("error occurred in agent during running")
 }
 
 func printBuildInfo() {

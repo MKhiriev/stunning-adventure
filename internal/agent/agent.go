@@ -40,13 +40,25 @@ type MetricsAgent struct {
 	hasher         *utils.Hasher
 	rateLimit      int64
 	publicKey      *rsa.PublicKey // public key to encrypt message
+	realIpAddress  string
 }
 
 // NewMetricsAgent initializes and returns a new MetricsAgent with configuration values.
-func NewMetricsAgent(route string, publicKey *rsa.PublicKey, cfg *config.AgentConfig, logger *zerolog.Logger) *MetricsAgent {
+func NewMetricsAgent(route string, publicKey *rsa.PublicKey, cfg *config.AgentConfig, logger *zerolog.Logger) (*MetricsAgent, error) {
+	if err := utils.CheckIfValidIPAddress(cfg.ServerAddress); err != nil {
+		return nil, fmt.Errorf("invalid server address: %w", err)
+	}
+
+	serverAddress := fmt.Sprintf("%s%s", "http://", cfg.ServerAddress)
+
+	sendTo, pathJoinError := url.JoinPath(serverAddress, route, "/")
+	if pathJoinError != nil {
+		return nil, fmt.Errorf("error constructing route for sending metrics: %w", pathJoinError)
+	}
+
 	agent := &MetricsAgent{
-		serverAddress:  "http://" + cfg.ServerAddress,
-		route:          route,
+		serverAddress:  cfg.ServerAddress,
+		route:          sendTo,
 		client:         utils.NewHTTPClient(5 * time.Second),
 		memory:         NewStorage(),
 		pollCount:      0,
@@ -70,7 +82,7 @@ func NewMetricsAgent(route string, publicKey *rsa.PublicKey, cfg *config.AgentCo
 			return agent.retryIntervals[response.Request.Attempt], nil
 		}).SetRetryMaxWaitTime(5 * time.Second)
 
-	return agent
+	return agent, nil
 }
 
 // ReadMetrics reads runtime memory metrics and refreshes the in-memory cache.
@@ -97,12 +109,6 @@ func (m *MetricsAgent) SendBatchMetricsJSON() error {
 		return errors.New("no metrics passed")
 	}
 
-	route, pathJoinError := url.JoinPath(m.serverAddress, m.route, "/")
-	if pathJoinError != nil {
-		m.logger.Err(pathJoinError).Caller().Str("func", "*MetricsAgent.SendBatchMetricsJSON").Msg("url join error")
-		return fmt.Errorf("url join error: %w", pathJoinError)
-	}
-
 	// gzip encode metrics
 	compressedMetrics, compressionError := gzipCompressMultipleMetrics(allMetrics...)
 	if compressionError != nil {
@@ -117,7 +123,7 @@ func (m *MetricsAgent) SendBatchMetricsJSON() error {
 			"Content-Encoding": "gzip",
 		}).
 		SetBody(compressedMetrics).
-		Post(route)
+		Post(m.route)
 	if sendMetricError != nil {
 		m.logger.Err(sendMetricError).Caller().Str("func", "*MetricsAgent.SendBatchMetricsJSON").Msg("error occurred during sending metric")
 		return fmt.Errorf("error occurred during sending metric: %w", sendMetricError)
@@ -158,17 +164,21 @@ func (m *MetricsAgent) sendMetrics(metric ...models.Metrics) error {
 		m.logger.Error().Caller().Str("func", "*MetricsAgent.sendMetrics").Msg("no metric was passed!")
 		return errors.New("no metric was passed")
 	}
-	// construct a route
-	route, pathJoinError := url.JoinPath(m.serverAddress, m.route, "/")
-	if pathJoinError != nil {
-		m.logger.Err(pathJoinError).Caller().Str("func", "*MetricsAgent.sendMetrics").Msg("url join error")
-		return fmt.Errorf("url join error: %w", pathJoinError)
+
+	// get a real IP
+	if m.realIpAddress == "" {
+		realIp, err := utils.GetLocalIP(m.serverAddress)
+		if err != nil {
+			return fmt.Errorf("unable to get real agent IP: %w", err)
+		}
+		m.realIpAddress = realIp.String()
 	}
 
 	// construct headers
 	headers := map[string]string{
 		"Content-Type":     "application/json",
 		"Content-Encoding": "gzip",
+		"X-Real-IP":        m.realIpAddress,
 	}
 
 	// include hash of the body
@@ -204,7 +214,8 @@ func (m *MetricsAgent) sendMetrics(metric ...models.Metrics) error {
 		SetHeaders(headers).
 		SetBody(compressedMetric).
 		SetResult(&response).
-		Post(route)
+		Post(m.route)
+
 	if sendMetricError != nil {
 		m.logger.Err(sendMetricError).Caller().Str("func", "*MetricsAgent.sendMetrics").Msg("error occurred during sending metric")
 		return fmt.Errorf("error occurred during sending metric: %w", sendMetricError)
