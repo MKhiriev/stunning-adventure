@@ -22,7 +22,9 @@ type ServerConfig struct {
 	AuditFile              string `env:"AUDIT_FILE"`        // local file path for audit logs
 	AuditURL               string `env:"AUDIT_URL"`         // external URL to send audit logs
 	PrivateCryptoKeyPath   string `env:"CRYPTO_KEY"`        // private key path for decryption of data from agent
-	JSONConfigFile         string `env:"CONFIG"`            // json file path with configs
+	TrustedSubnet          string `env:"TRUSTED_SUBNET"`    // CIDR of the trusted subnet; accepts requests only from within this subnet
+
+	JSONConfigFile string `env:"CONFIG"` // json file path with configs
 }
 
 type serverConfigBuilder struct {
