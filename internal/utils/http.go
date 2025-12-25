@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -28,4 +29,15 @@ func GetLocalIP(address string) (net.IP, error) {
 	}
 
 	return localAddress.IP, nil
+}
+
+func CheckIfValidIPAddress(address string) error {
+	ip := strings.Split(address, ":")[0]
+
+	_, err := net.ResolveIPAddr("ip", ip)
+	if err != nil {
+		return fmt.Errorf("incorrect ip: %v\n", err)
+	}
+
+	return nil
 }
