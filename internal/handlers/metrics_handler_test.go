@@ -20,6 +20,7 @@ import (
 
 func TestMetricHandler(t *testing.T) {
 	h := initHandler()
+	assert.NotNil(t, h)
 	ts := httptest.NewServer(h.Init())
 	defer ts.Close()
 
@@ -104,6 +105,7 @@ func TestMetricHandler(t *testing.T) {
 
 func TestGetValueFromMetric(t *testing.T) {
 	h := initHandler()
+	assert.NotNil(t, h)
 	type want struct {
 		result string
 	}
@@ -160,7 +162,12 @@ func initHandler() *Handler {
 
 	var privateKey *rsa.PrivateKey
 
-	return NewHandler(metricsService, dbPingService, auditService, privateKey, cfg, &logger)
+	handler, err := NewHandler(metricsService, dbPingService, auditService, privateKey, cfg, &logger)
+	if err != nil {
+		return nil
+	}
+
+	return handler
 }
 
 func mDelta(v int) *int64 {

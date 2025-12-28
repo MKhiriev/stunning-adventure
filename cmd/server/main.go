@@ -80,7 +80,11 @@ func main() {
 		}
 	}
 
-	handler := handlers.NewHandler(metricsService, pingService, auditService, privateKey, cfg, log)
+	handler, err := handlers.NewHandler(metricsService, pingService, auditService, privateKey, cfg, log)
+	if err != nil {
+		log.Err(err).Msg("error creating handler occurred")
+		return
+	}
 	myServer := new(server.Server)
 	myServer.ServerRun(handler.Init(), cfg)
 }
