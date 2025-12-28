@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"crypto/rsa"
+	"net"
 
 	"github.com/MKhiriev/stunning-adventure/internal/config"
 	"github.com/MKhiriev/stunning-adventure/internal/service"
@@ -20,11 +21,12 @@ type Handler struct {
 
 	metricValidator validators.Validator
 	hashKey         string
+	trustedSubnet   *net.IPNet
 
 	privateKey *rsa.PrivateKey // key for decrypting messages
 }
 
-func NewHandler(metricsService service.MetricsService, dbPingService service.PingService, auditService service.AuditPublisher, privateKey *rsa.PrivateKey, cfg *config.ServerConfig, logger *zerolog.Logger) *Handler {
+func NewHandler(metricsService service.MetricsService, dbPingService service.PingService, auditService service.AuditPublisher, privateKey *rsa.PrivateKey, cfg *config.ServerConfig, logger *zerolog.Logger) (*Handler, error) {
 	handler := &Handler{
 		logger:         logger,
 		metricsService: metricsService,
@@ -40,14 +42,29 @@ func NewHandler(metricsService service.MetricsService, dbPingService service.Pin
 		logger.Info().Str("func", "NewHandler").Msg("private key added to the server!")
 	}
 
+	if cfg.TrustedSubnet != "" {
+		_, ipNet, err := net.ParseCIDR(cfg.TrustedSubnet)
+		if err != nil {
+			logger.Err(err).Str("func", "NewHandler").Msg("invalid trusted subnet config was passed")
+			return nil, err
+		}
+
+		handler.trustedSubnet = ipNet
+	}
+
 	utils.InitHasherPool(cfg.HashKey)
 
-	return handler
+	return handler, nil
 }
 
 func (h *Handler) Init() *chi.Mux {
 	router := chi.NewRouter()
 	router.Use(middleware.Recoverer)
+
+	if h.trustedSubnet != nil {
+		router.Use(h.CheckIPTrustedSubnet) // todo wrap in if statement
+	}
+
 	router.Use(h.WithLogging)
 	if h.privateKey != nil {
 		router.Use(h.WithDecryption)
