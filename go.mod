@@ -3,6 +3,8 @@ module github.com/MKhiriev/stunning-adventure
 go 1.24.11
 
 require (
+	dario.cat/mergo v1.0.2
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/caarlos0/env/v11 v11.3.1
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/go-resty/resty/v2 v2.17.0
@@ -12,11 +14,10 @@ require (
 	github.com/shirou/gopsutil/v4 v4.25.11
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/tools v0.39.0
+	google.golang.org/protobuf v1.36.11
 )
 
 require (
-	dario.cat/mergo v1.0.2 // indirect
-	github.com/DATA-DOG/go-sqlmock v1.5.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/ebitengine/purego v0.9.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
