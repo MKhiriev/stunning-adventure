@@ -14,7 +14,7 @@ import (
 )
 
 func TestReadMetrics(t *testing.T) {
-	agent := initAgent()
+	agent := initAgent(t)
 
 	type want struct {
 		moreThanZeroMetrics bool
@@ -50,7 +50,7 @@ func TestReadMetrics(t *testing.T) {
 }
 
 func TestSendMetrics(t *testing.T) {
-	agent := initAgent()
+	agent := initAgent(t)
 
 	type want struct {
 		code          int
@@ -141,13 +141,17 @@ func TestSendMetrics(t *testing.T) {
 	}
 }
 
-func initAgent() *MetricsAgent {
+func initAgent(t *testing.T) *MetricsAgent {
 	cfg := &config.AgentConfig{
 		ServerAddress:  "0.0.0.0",
 		ReportInterval: 2,
 		PollInterval:   1,
 	}
-	return NewMetricsAgent("update", nil, cfg, &zerolog.Logger{})
+
+	agent, err := NewMetricsAgent("update", nil, cfg, &zerolog.Logger{})
+	require.NoError(t, err, "failed to create metrics agent")
+
+	return agent
 }
 
 func mDelta(v int) *int64 {

@@ -110,7 +110,7 @@ func (m *MetricsAgent) SendBatchMetricsJSON() error {
 	}
 
 	// gzip encode metrics
-	compressedMetrics, compressionError := gzipCompressMultipleMetrics(allMetrics...)
+	compressedMetrics, compressionError := gzipCompress(allMetrics...)
 	if compressionError != nil {
 		m.logger.Err(compressionError).Caller().Str("func", "*MetricsAgent.SendBatchMetricsJSON").Msg("error occurred during gzip compression")
 		return compressionError
@@ -380,50 +380,14 @@ func (m *MetricsAgent) getRoute(metric models.Metrics) (string, error) {
 	return "", errors.New("error occurred during route construction")
 }
 
-func gzipCompress(metric ...models.Metrics) ([]byte, error) {
-	var jsonData []byte
-	var err error
-
-	if len(metric) == 1 {
-		jsonData, err = json.Marshal(metric[0])
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal metric: %w", err)
-		}
-	} else {
-		// сериализуем metric в JSON
-		jsonData, err = json.Marshal(metric)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal metrics: %w", err)
-		}
+func gzipCompress(metrics ...models.Metrics) ([]byte, error) {
+	if len(metrics) == 0 {
+		return nil, errors.New("no metrics provided")
 	}
 
-	// создаем gzip-сжатие
-	var buf bytes.Buffer
-	gz := gzip.NewWriter(&buf)
-	if _, err := gz.Write(jsonData); err != nil {
-		return nil, fmt.Errorf("failed to gzip compress: %w", err)
-	}
-	if err := gz.Close(); err != nil {
-		return nil, fmt.Errorf("failed to close gzip writer: %w", err)
-	}
-
-	return buf.Bytes(), nil
-}
-
-func gzipCompressMultipleMetrics(metrics ...models.Metrics) ([]byte, error) {
-	var jsonData []byte
-	var err error
-	// сериализуем metrics в JSON
-	if len(metrics) == 1 {
-		jsonData, err = json.Marshal(metrics[0])
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal metric: %w", err)
-		}
-	} else {
-		jsonData, err = json.Marshal(metrics)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal metric: %w", err)
-		}
+	jsonData, err := json.Marshal(metrics)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal metric(s): %w", err)
 	}
 
 	// создаем gzip-сжатие
