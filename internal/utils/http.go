@@ -17,7 +17,7 @@ func NewHTTPClient(timeout time.Duration) *resty.Client {
 }
 
 func GetLocalIP(address string) (net.IP, error) {
-	conn, err := net.Dial("udp", address)
+	conn, err := net.Dial("udp4", address)
 	if err != nil {
 		return nil, fmt.Errorf("error dialing server: %w", err)
 	}
