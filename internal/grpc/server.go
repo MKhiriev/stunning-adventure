@@ -39,7 +39,7 @@ func (s *MetricsServer) UpdateMetrics(ctx context.Context, metricsRequest *proto
 		return nil, errNilRequest
 	}
 
-	s.logger.Info().Str("func", "*grpc.MetricsServer.UpdateMetrics").Msg("UpdateMetrics was called!")
+	s.logger.Info().Str("func", "*grpc.MetricsServer.UpdateMetrics").Msg("UpdateMetrics was called")
 
 	protoMetrics := metricsRequest.GetMetrics()
 	if protoMetrics == nil {
@@ -69,5 +69,6 @@ func (s *MetricsServer) UpdateMetrics(ctx context.Context, metricsRequest *proto
 		}
 	}
 
+	s.logger.Info().Str("func", "*grpc.MetricsServer.UpdateMetrics").Msg("metrics are updated!")
 	return &proto.UpdateMetricsResponse{}, nil
 }

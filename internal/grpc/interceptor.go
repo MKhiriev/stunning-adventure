@@ -23,21 +23,21 @@ func TrustedSubnetInterceptor(trustedSubnet *net.IPNet, logger *zerolog.Logger) 
 			return nil, errMissingMetadata
 		}
 
-		realIPValues := md.Get("x-real-ip")
+		realIPValues := md.Get("X-Real-IP")
 		if len(realIPValues) == 0 {
-			logger.Error().Msg("x-real-ip header is missing")
+			logger.Error().Msg("X-Real-IP header is missing")
 			return nil, errMissingRealIpMetadata
 		}
 
 		realIP := realIPValues[0]
 		if realIP == "" {
-			logger.Error().Msg("x-real-ip header is empty")
+			logger.Error().Msg("X-Real-IP header is empty")
 			return nil, errEmptyRealIpMetadata
 		}
 
 		ip, err := netip.ParseAddr(realIP)
 		if err != nil {
-			logger.Err(err).Str("ip", realIP).Msg("invalid IP address in x-real-ip")
+			logger.Err(err).Str("ip", realIP).Msg("invalid IP address in X-Real-IP")
 			return nil, errInvalidIPAddress
 		}
 

@@ -114,7 +114,6 @@ func setupServer(server *server.Server, metricsService service.MetricsService, p
 	if cfg.GrpcServerAddress == "" && cfg.ServerAddress == "" {
 		log.Fatal().Msgf("no server was specified!")
 	}
-
 	if cfg.GrpcServerAddress != "" && cfg.GrpcServerAddress == cfg.ServerAddress {
 		log.Fatal().Msgf("gRPC and HTTP servers have the same port")
 	}

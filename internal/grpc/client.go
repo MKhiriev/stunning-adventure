@@ -104,7 +104,7 @@ func (c *Client) Close() error {
 
 func AddIPToContext(ctx context.Context, ip string) context.Context {
 	md := metadata.New(map[string]string{
-		"x-real-ip": ip,
+		"X-Real-IP": ip,
 	})
 	return metadata.NewOutgoingContext(ctx, md)
 }
