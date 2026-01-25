@@ -16,9 +16,8 @@ import (
 )
 
 type HTTPMetricsSender struct {
-	serverAddress string        // full server address including http://
-	route         string        // server route for sending metrics
-	client        *resty.Client // HTTP client for sending metrics
+	route  string        // server route for sending metrics
+	client *resty.Client // HTTP client for sending metrics
 
 	hasher    *utils.Hasher
 	publicKey *rsa.PublicKey
@@ -27,23 +26,26 @@ type HTTPMetricsSender struct {
 	realIP string
 }
 
-func NewHTTPMetricsSender(serverAddress, route string, retryIntervals map[int]time.Duration, hasher *utils.Hasher, publicKey *rsa.PublicKey, logger *zerolog.Logger) *HTTPMetricsSender {
-	logger.Debug().Msgf("ADDRESS: `%s`", serverAddress)
-
+func NewHTTPMetricsSender(serverAddress, route string, retryIntervals map[int]time.Duration, hasher *utils.Hasher, publicKey *rsa.PublicKey, logger *zerolog.Logger) (*HTTPMetricsSender, error) {
 	httpClient := utils.NewHTTPClient(5 * time.Second)
 	httpClient.SetRetryCount(3).
 		SetRetryAfter(func(client *resty.Client, response *resty.Response) (time.Duration, error) {
 			return retryIntervals[response.Request.Attempt], nil
 		}).SetRetryMaxWaitTime(5 * time.Second)
 
-	return &HTTPMetricsSender{
-		serverAddress: serverAddress,
-		route:         route,
-		client:        httpClient,
-		hasher:        hasher,
-		publicKey:     publicKey,
-		logger:        logger,
+	realIp, err := utils.GetLocalIP(serverAddress)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get real agent IP: %w", err)
 	}
+
+	return &HTTPMetricsSender{
+		route:     route,
+		client:    httpClient,
+		hasher:    hasher,
+		publicKey: publicKey,
+		logger:    logger,
+		realIP:    realIp.String(),
+	}, nil
 }
 
 func (m *HTTPMetricsSender) Send(metrics ...models.Metrics) error {
@@ -59,15 +61,6 @@ func (m *HTTPMetricsSender) sendMetrics(metrics ...models.Metrics) error {
 	if len(metrics) == 0 {
 		m.logger.Error().Str("func", "*HTTPMetricsSender.sendMetrics").Msg("no metric was passed!")
 		return errors.New("no metric was passed")
-	}
-
-	// get a real IP
-	if m.realIP == "" {
-		realIp, err := utils.GetLocalIP(m.serverAddress)
-		if err != nil {
-			return fmt.Errorf("unable to get real agent IP: %w", err)
-		}
-		m.realIP = realIp.String()
 	}
 
 	// construct headers

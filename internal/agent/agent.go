@@ -43,7 +43,13 @@ func NewMetricsAgent(route string, publicKey *rsa.PublicKey, cfg *config.AgentCo
 		return nil, fmt.Errorf("invalid server address: %w", err)
 	}
 
-	client, err := GetAgentMetricsSender(route, utils.NewHasher(cfg.HashKey), publicKey, cfg, logger)
+	retryIntervals := map[int]time.Duration{
+		1: 1 * time.Second,
+		2: 3 * time.Second,
+		3: 5 * time.Second,
+	}
+
+	client, err := GetAgentMetricsSender(route, retryIntervals, utils.NewHasher(cfg.HashKey), publicKey, cfg, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -64,26 +70,15 @@ func NewMetricsAgent(route string, publicKey *rsa.PublicKey, cfg *config.AgentCo
 	return agent, nil
 }
 
-func GetAgentMetricsSender(route string, hasher *utils.Hasher, publicKey *rsa.PublicKey, cfg *config.AgentConfig, logger *zerolog.Logger) (MetricsSender, error) {
-	serverAddress := fmt.Sprintf("%s%s", "http://", cfg.ServerAddress)
-
-	sendTo, pathJoinError := url.JoinPath(serverAddress, route, "/")
-	if pathJoinError != nil {
-		return nil, fmt.Errorf("error constructing route for sending metrics: %w", pathJoinError)
+func GetAgentMetricsSender(route string, retryIntervals map[int]time.Duration, hasher *utils.Hasher, publicKey *rsa.PublicKey, cfg *config.AgentConfig, logger *zerolog.Logger) (MetricsSender, error) {
+	switch {
+	case cfg.ServerAddress != "":
+		return createHTTPMetricsSender(route, retryIntervals, hasher, publicKey, cfg, logger)
+	case cfg.GrpcServerAddress != "":
+		return createGRPCMetricsSender(route, retryIntervals, cfg, logger)
 	}
 
-	retryIntervals := map[int]time.Duration{
-		1: 1 * time.Second,
-		2: 3 * time.Second,
-		3: 5 * time.Second,
-	}
-
-	client := NewHTTPMetricsSender(cfg.ServerAddress, sendTo, retryIntervals, hasher, publicKey, logger)
-	if client == nil {
-		return nil, errors.New("unexpected error creating agent metrics sender")
-	}
-
-	return client, nil
+	return nil, nil
 }
 
 // Run starts the MetricsAgent lifecycle, including reading metrics and sending
@@ -206,4 +201,36 @@ func (m *MetricsAgent) withWorkers(wg *sync.WaitGroup, fn func(), count int64) {
 		go fn()
 		m.logger.Debug().Msgf("worker#%d is created", i)
 	}
+}
+
+func createHTTPMetricsSender(route string, retryIntervals map[int]time.Duration, hasher *utils.Hasher, publicKey *rsa.PublicKey, cfg *config.AgentConfig, logger *zerolog.Logger) (MetricsSender, error) {
+	serverAddress := fmt.Sprintf("%s%s", "http://", cfg.ServerAddress)
+
+	sendTo, pathJoinError := url.JoinPath(serverAddress, route, "/")
+	if pathJoinError != nil {
+		return nil, fmt.Errorf("error constructing route for sending metrics: %w", pathJoinError)
+	}
+
+	client, err := NewHTTPMetricsSender(cfg.ServerAddress, sendTo, retryIntervals, hasher, publicKey, logger)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected error creating agent metrics sender: %w", err)
+	}
+
+	return client, nil
+}
+
+func createGRPCMetricsSender(route string, retryIntervals map[int]time.Duration, cfg *config.AgentConfig, logger *zerolog.Logger) (MetricsSender, error) {
+	serverAddress := fmt.Sprintf("%s%s", "http://", cfg.ServerAddress) // TODO change to gRPC
+
+	sendTo, pathJoinError := url.JoinPath(serverAddress, route, "/")
+	if pathJoinError != nil {
+		return nil, fmt.Errorf("error constructing route for sending metrics: %w", pathJoinError)
+	}
+
+	client, err := NewGRPCMetricsSender(serverAddress, sendTo, retryIntervals, cfg, logger)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected error creating agent metrics sender: %w", err)
+	}
+
+	return client, nil
 }
