@@ -130,10 +130,13 @@ func runHTTPServer(metricsService service.MetricsService, pingService service.Pi
 }
 
 func runGRPCServer(metricsService service.MetricsService, cfg *config.ServerConfig, log *zerolog.Logger) {
+	if cfg.TrustedSubnet == "" {
+		log.Fatal().Msg("trusted subnet is empty")
+	}
+
 	grpcMetricsServer, err := myGrpc.NewMetricsServer(metricsService, cfg, log)
 	if err != nil {
-		log.Err(err).Msg("error creating grpc server")
-		return
+		log.Fatal().Err(err).Msg("error creating grpc server")
 	}
 
 	lis, err := net.Listen("tcp", cfg.GrpcServerAddress)
@@ -141,7 +144,18 @@ func runGRPCServer(metricsService service.MetricsService, cfg *config.ServerConf
 		log.Fatal().Msgf("failed to listen: %v", err)
 	}
 
-	server := grpc.NewServer()
+	trustedSubnet, err := myGrpc.ParseTrustedSubnet(cfg.TrustedSubnet)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to parse trusted subnet")
+	}
+
+	var serverOpts []grpc.ServerOption
+	if trustedSubnet != nil {
+		log.Info().Str("trusted_subnet", trustedSubnet.String()).Msg("enabling trusted subnet check")
+		serverOpts = append(serverOpts, grpc.UnaryInterceptor(myGrpc.TrustedSubnetInterceptor(trustedSubnet, log)))
+	}
+
+	server := grpc.NewServer(serverOpts...)
 	myProto.RegisterMetricsServer(server, grpcMetricsServer)
 
 	log.Info().Msg("Launching GRPC Server")
