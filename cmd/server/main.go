@@ -11,6 +11,7 @@ package main
 import (
 	"context"
 	"crypto/rsa"
+	"errors"
 	"fmt"
 	"net"
 
@@ -85,7 +86,10 @@ func main() {
 		}
 	}
 
-	runServer(metricsService, pingService, auditService, privateKey, cfg, log)
+	myServer := new(server.Server)
+	setupServer(myServer, metricsService, pingService, auditService, privateKey, cfg, log)
+
+	myServer.ServerRun()
 }
 
 func printBuildInfo() {
@@ -106,47 +110,61 @@ func printBuildInfo() {
 	fmt.Printf("Build commit: %s\n", buildCommit)
 }
 
-func runServer(metricsService service.MetricsService, pingService service.PingService, auditService service.AuditPublisher, privateKey *rsa.PrivateKey, cfg *config.ServerConfig, log *zerolog.Logger) {
-	switch {
-	case cfg.GrpcServerAddress != "":
-		runGRPCServer(metricsService, cfg, log)
-	case cfg.ServerAddress != "":
-		runHTTPServer(metricsService, pingService, auditService, privateKey, cfg, log)
-	default:
+func setupServer(server *server.Server, metricsService service.MetricsService, pingService service.PingService, auditService service.AuditPublisher, privateKey *rsa.PrivateKey, cfg *config.ServerConfig, log *zerolog.Logger) {
+	if cfg.GrpcServerAddress == "" && cfg.ServerAddress == "" {
 		log.Fatal().Msgf("no server was specified!")
 	}
+
+	if cfg.GrpcServerAddress != "" && cfg.GrpcServerAddress == cfg.ServerAddress {
+		log.Fatal().Msgf("gRPC and HTTP servers have the same port")
+	}
+
+	if cfg.GrpcServerAddress != "" {
+		grpcServer, lis, err := getGRPCServer(metricsService, cfg, log)
+		if err != nil {
+			log.Fatal().Msgf("grpc server setup fail: %v", err)
+		}
+
+		server.GRPCServer(grpcServer, lis)
+	}
+	if cfg.ServerAddress != "" {
+		httpServerHandler, err := getHTTPServerHandler(metricsService, pingService, auditService, privateKey, cfg, log)
+		if err != nil {
+			log.Fatal().Msgf("http server setup fail: %v", err)
+		}
+
+		server.HTTPServer(httpServerHandler.Init(), cfg)
+	}
 }
 
-func runHTTPServer(metricsService service.MetricsService, pingService service.PingService, auditService service.AuditPublisher, privateKey *rsa.PrivateKey, cfg *config.ServerConfig, log *zerolog.Logger) {
+func getHTTPServerHandler(metricsService service.MetricsService, pingService service.PingService, auditService service.AuditPublisher, privateKey *rsa.PrivateKey, cfg *config.ServerConfig, log *zerolog.Logger) (*handlers.Handler, error) {
 	handler, err := handlers.NewHandler(metricsService, pingService, auditService, privateKey, cfg, log)
 	if err != nil {
-		log.Err(err).Msg("error creating handler occurred")
-		return
+		return nil, err
 	}
-	myServer := new(server.Server)
 
-	log.Info().Msg("Launching HTTP Server")
-	myServer.ServerRun(handler.Init(), cfg)
+	return handler, nil
+
 }
 
-func runGRPCServer(metricsService service.MetricsService, cfg *config.ServerConfig, log *zerolog.Logger) {
+func getGRPCServer(metricsService service.MetricsService, cfg *config.ServerConfig, log *zerolog.Logger) (*grpc.Server, net.Listener, error) {
 	if cfg.TrustedSubnet == "" {
-		log.Fatal().Msg("trusted subnet is empty")
+		return nil, nil, errors.New("trusted subnet is empty")
 	}
 
 	grpcMetricsServer, err := myGrpc.NewMetricsServer(metricsService, cfg, log)
 	if err != nil {
-		log.Fatal().Err(err).Msg("error creating grpc server")
+		return nil, nil, errors.New("error creating grpc server")
 	}
 
 	lis, err := net.Listen("tcp", cfg.GrpcServerAddress)
 	if err != nil {
-		log.Fatal().Msgf("failed to listen: %v", err)
+		return nil, nil, fmt.Errorf("failed to listen: %w", err)
 	}
 
 	trustedSubnet, err := myGrpc.ParseTrustedSubnet(cfg.TrustedSubnet)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to parse trusted subnet")
+		return nil, nil, fmt.Errorf("failed to parse trusted subnet: %w", err)
 	}
 
 	var serverOpts []grpc.ServerOption
@@ -155,9 +173,8 @@ func runGRPCServer(metricsService service.MetricsService, cfg *config.ServerConf
 		serverOpts = append(serverOpts, grpc.UnaryInterceptor(myGrpc.TrustedSubnetInterceptor(trustedSubnet, log)))
 	}
 
-	server := grpc.NewServer(serverOpts...)
-	myProto.RegisterMetricsServer(server, grpcMetricsServer)
+	grpcServer := grpc.NewServer(serverOpts...)
+	myProto.RegisterMetricsServer(grpcServer, grpcMetricsServer)
 
-	log.Info().Msg("Launching GRPC Server")
-	server.Serve(lis)
+	return grpcServer, lis, nil
 }
