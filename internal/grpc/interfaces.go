@@ -8,4 +8,6 @@ import (
 type MetricsConverter interface {
 	ConvertMetricFromProto(protoMetric *proto.Metric) (models.Metrics, error)
 	ConvertMetricsFromProto(protoMetrics ...*proto.Metric) ([]models.Metrics, error)
+	ConvertMetricToProto(metric models.Metrics) (*proto.Metric, error)
+	ConvertMetricsToProto(metrics ...models.Metrics) ([]*proto.Metric, error)
 }

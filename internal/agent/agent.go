@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/MKhiriev/stunning-adventure/internal/config"
+	"github.com/MKhiriev/stunning-adventure/internal/grpc"
 	"github.com/MKhiriev/stunning-adventure/internal/utils"
 	"github.com/MKhiriev/stunning-adventure/models"
 	"github.com/rs/zerolog"
@@ -39,10 +40,6 @@ type MetricsAgent struct {
 
 // NewMetricsAgent initializes and returns a new MetricsAgent with configuration values.
 func NewMetricsAgent(route string, publicKey *rsa.PublicKey, cfg *config.AgentConfig, logger *zerolog.Logger) (*MetricsAgent, error) {
-	if err := utils.CheckIfValidIPAddress(cfg.ServerAddress); err != nil {
-		return nil, fmt.Errorf("invalid server address: %w", err)
-	}
-
 	retryIntervals := map[int]time.Duration{
 		1: 1 * time.Second,
 		2: 3 * time.Second,
@@ -72,10 +69,12 @@ func NewMetricsAgent(route string, publicKey *rsa.PublicKey, cfg *config.AgentCo
 
 func GetAgentMetricsSender(route string, retryIntervals map[int]time.Duration, hasher *utils.Hasher, publicKey *rsa.PublicKey, cfg *config.AgentConfig, logger *zerolog.Logger) (MetricsSender, error) {
 	switch {
-	case cfg.ServerAddress != "":
-		return createHTTPMetricsSender(route, retryIntervals, hasher, publicKey, cfg, logger)
 	case cfg.GrpcServerAddress != "":
-		return createGRPCMetricsSender(route, retryIntervals, cfg, logger)
+		logger.Debug().Str("func", "GetAgentMetricsSender").Msg("creating gRPC metrics sender...")
+		return createGRPCMetricsSender(retryIntervals, cfg, logger)
+	case cfg.ServerAddress != "":
+		logger.Debug().Str("func", "GetAgentMetricsSender").Msg("creating HTTP metrics sender...")
+		return createHTTPMetricsSender(route, retryIntervals, hasher, publicKey, cfg, logger)
 	}
 
 	return nil, nil
@@ -204,6 +203,10 @@ func (m *MetricsAgent) withWorkers(wg *sync.WaitGroup, fn func(), count int64) {
 }
 
 func createHTTPMetricsSender(route string, retryIntervals map[int]time.Duration, hasher *utils.Hasher, publicKey *rsa.PublicKey, cfg *config.AgentConfig, logger *zerolog.Logger) (MetricsSender, error) {
+	if err := utils.CheckIfValidIPAddress(cfg.ServerAddress); err != nil {
+		return nil, fmt.Errorf("invalid server address: %w", err)
+	}
+
 	serverAddress := fmt.Sprintf("%s%s", "http://", cfg.ServerAddress)
 
 	sendTo, pathJoinError := url.JoinPath(serverAddress, route, "/")
@@ -219,15 +222,17 @@ func createHTTPMetricsSender(route string, retryIntervals map[int]time.Duration,
 	return client, nil
 }
 
-func createGRPCMetricsSender(route string, retryIntervals map[int]time.Duration, cfg *config.AgentConfig, logger *zerolog.Logger) (MetricsSender, error) {
-	serverAddress := fmt.Sprintf("%s%s", "http://", cfg.ServerAddress) // TODO change to gRPC
-
-	sendTo, pathJoinError := url.JoinPath(serverAddress, route, "/")
-	if pathJoinError != nil {
-		return nil, fmt.Errorf("error constructing route for sending metrics: %w", pathJoinError)
+func createGRPCMetricsSender(retryIntervals map[int]time.Duration, cfg *config.AgentConfig, logger *zerolog.Logger) (MetricsSender, error) {
+	if err := utils.CheckIfValidIPAddress(cfg.GrpcServerAddress); err != nil {
+		return nil, fmt.Errorf("invalid grpc server address: %w", err)
 	}
 
-	client, err := NewGRPCMetricsSender(serverAddress, sendTo, retryIntervals, cfg, logger)
+	retryConfig := grpc.RetryConfig{
+		MaxAttempts: len(retryIntervals),
+		Intervals:   retryIntervals,
+	}
+
+	client, err := NewGRPCMetricsSender(cfg.GrpcServerAddress, retryConfig, logger)
 	if err != nil {
 		return nil, fmt.Errorf("unexpected error creating agent metrics sender: %w", err)
 	}

@@ -1,45 +1,72 @@
 package agent
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/MKhiriev/stunning-adventure/internal/config"
+	"github.com/MKhiriev/stunning-adventure/internal/grpc"
 	"github.com/MKhiriev/stunning-adventure/internal/utils"
 	"github.com/MKhiriev/stunning-adventure/models"
 	"github.com/rs/zerolog"
 )
 
-// TODO implement
 type GRPCMetricsSender struct {
-	route string // server route for sending metrics
-	// todo add gRPC client
-	logger *zerolog.Logger
-
-	realIP string
+	client  *grpc.Client
+	address string
+	localIP string
+	logger  *zerolog.Logger
 }
 
-func NewGRPCMetricsSender(serverAddress, route string, retryIntervals map[int]time.Duration, cfg *config.AgentConfig, logger *zerolog.Logger) (*GRPCMetricsSender, error) {
-
-	// dial server address
-	realIp, err := utils.GetLocalIP(serverAddress)
+func NewGRPCMetricsSender(address string, retryConfig grpc.RetryConfig, logger *zerolog.Logger) (*GRPCMetricsSender, error) {
+	localIP, err := utils.GetLocalIP(address)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get real agent IP: %w", err)
+		return nil, fmt.Errorf("failed to get local IP address: %w", err)
+	}
+
+	client, err := grpc.NewGRPCClient(address, retryConfig, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create grpc client: %w", err)
 	}
 
 	return &GRPCMetricsSender{
-		route:  route,
-		logger: logger,
-		realIP: realIp.String(),
+		client:  client,
+		address: address,
+		localIP: localIP.String(),
+		logger:  logger,
 	}, nil
 }
 
 func (s *GRPCMetricsSender) Send(metrics ...models.Metrics) error {
-	//TODO implement me
-	panic("implement me")
+	ctx := context.Background()
+
+	ctx = grpc.AddIPToContext(ctx, s.localIP)
+	s.logger.Debug().
+		Str("ip", s.localIP).
+		Msg("added local IP to request metadata")
+
+	if err := s.client.UpdateMetrics(ctx, metrics); err != nil {
+		return fmt.Errorf("failed to send metrics via grpc: %w", err)
+	}
+
+	s.logger.Info().
+		Int("count", len(metrics)).
+		Msg("successfully sent metrics via grpc")
+
+	return nil
 }
 
 func (s *GRPCMetricsSender) Close() error {
-	//TODO implement me
-	panic("implement me")
+	return s.client.Close()
+}
+
+func DefaultRetryConfig() grpc.RetryConfig {
+	return grpc.RetryConfig{
+		MaxAttempts: 3,
+		Intervals: map[int]time.Duration{
+			1: 1 * time.Second,
+			2: 3 * time.Second,
+			3: 5 * time.Second,
+		},
+	}
 }
