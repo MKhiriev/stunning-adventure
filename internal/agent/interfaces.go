@@ -18,8 +18,6 @@
 package agent
 
 import (
-	"context"
-
 	"github.com/MKhiriev/stunning-adventure/models"
 )
 
@@ -37,8 +35,8 @@ type MemStorage interface {
 	Flush()                                      // clears all cached metrics
 }
 
-// Client defines a client that sends metrics to a server.
-type Client interface {
-	Send(ctx context.Context, metrics ...models.Metrics) error
+// MetricsSender defines a client that sends metrics to a server.
+type MetricsSender interface {
+	Send(metrics ...models.Metrics) error
 	Close() error
 }
