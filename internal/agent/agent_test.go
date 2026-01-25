@@ -135,7 +135,8 @@ func TestSendMetrics(t *testing.T) {
 			defer server.Close()
 			agent.serverAddress = server.URL
 
-			sendMetricsError := agent.SendMetrics()
+			metrics := agent.memory.GetAllMetrics()
+			sendMetricsError := agent.sendMetrics(metrics...)
 			require.NoError(t, sendMetricsError)
 		})
 	}
@@ -143,7 +144,7 @@ func TestSendMetrics(t *testing.T) {
 
 func initAgent(t *testing.T) *MetricsAgent {
 	cfg := &config.AgentConfig{
-		ServerAddress:  "0.0.0.0",
+		ServerAddress:  "0.0.0.0:8081",
 		ReportInterval: 2,
 		PollInterval:   1,
 	}
