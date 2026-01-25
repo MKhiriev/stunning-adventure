@@ -12,15 +12,20 @@ import (
 	"context"
 	"crypto/rsa"
 	"fmt"
+	"net"
 
 	"github.com/MKhiriev/stunning-adventure/internal/adapters"
 	"github.com/MKhiriev/stunning-adventure/internal/config"
+	myGrpc "github.com/MKhiriev/stunning-adventure/internal/grpc"
 	"github.com/MKhiriev/stunning-adventure/internal/handlers"
 	"github.com/MKhiriev/stunning-adventure/internal/logger"
+	myProto "github.com/MKhiriev/stunning-adventure/internal/proto"
 	"github.com/MKhiriev/stunning-adventure/internal/server"
 	"github.com/MKhiriev/stunning-adventure/internal/service"
 	"github.com/MKhiriev/stunning-adventure/internal/store"
 	"github.com/MKhiriev/stunning-adventure/internal/utils"
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -80,13 +85,7 @@ func main() {
 		}
 	}
 
-	handler, err := handlers.NewHandler(metricsService, pingService, auditService, privateKey, cfg, log)
-	if err != nil {
-		log.Err(err).Msg("error creating handler occurred")
-		return
-	}
-	myServer := new(server.Server)
-	myServer.ServerRun(handler.Init(), cfg)
+	runServer(metricsService, pingService, auditService, privateKey, cfg, log)
 }
 
 func printBuildInfo() {
@@ -105,4 +104,46 @@ func printBuildInfo() {
 	fmt.Printf("Build version: %s\n", buildVersion)
 	fmt.Printf("Build date: %s\n", buildDate)
 	fmt.Printf("Build commit: %s\n", buildCommit)
+}
+
+func runServer(metricsService service.MetricsService, pingService service.PingService, auditService service.AuditPublisher, privateKey *rsa.PrivateKey, cfg *config.ServerConfig, log *zerolog.Logger) {
+	switch {
+	case cfg.GrpcServerAddress != "":
+		runGRPCServer(metricsService, cfg, log)
+	case cfg.ServerAddress != "":
+		runHTTPServer(metricsService, pingService, auditService, privateKey, cfg, log)
+	default:
+		log.Fatal().Msgf("no server was specified!")
+	}
+}
+
+func runHTTPServer(metricsService service.MetricsService, pingService service.PingService, auditService service.AuditPublisher, privateKey *rsa.PrivateKey, cfg *config.ServerConfig, log *zerolog.Logger) {
+	handler, err := handlers.NewHandler(metricsService, pingService, auditService, privateKey, cfg, log)
+	if err != nil {
+		log.Err(err).Msg("error creating handler occurred")
+		return
+	}
+	myServer := new(server.Server)
+
+	log.Info().Msg("Launching HTTP Server")
+	myServer.ServerRun(handler.Init(), cfg)
+}
+
+func runGRPCServer(metricsService service.MetricsService, cfg *config.ServerConfig, log *zerolog.Logger) {
+	grpcMetricsServer, err := myGrpc.NewMetricsServer(metricsService, cfg, log)
+	if err != nil {
+		log.Err(err).Msg("error creating grpc server")
+		return
+	}
+
+	lis, err := net.Listen("tcp", cfg.GrpcServerAddress)
+	if err != nil {
+		log.Fatal().Msgf("failed to listen: %v", err)
+	}
+
+	server := grpc.NewServer()
+	myProto.RegisterMetricsServer(server, grpcMetricsServer)
+
+	log.Info().Msg("Launching GRPC Server")
+	server.Serve(lis)
 }
