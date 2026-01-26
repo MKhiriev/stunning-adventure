@@ -18,7 +18,7 @@ func NewHTTPClient(timeout time.Duration) *resty.Client {
 }
 
 func GetLocalIP(address string) (net.IP, error) {
-	address = serverAddress(address)
+	address = ServerAddress(address)
 
 	conn, err := net.Dial("udp4", address)
 	if err != nil {
@@ -45,7 +45,11 @@ func CheckIfValidIPAddress(address string) error {
 	return nil
 }
 
-func serverAddress(serverUrl string) string {
+func ServerAddress(serverUrl string) string {
+	if !strings.Contains(serverUrl, "://") {
+		return serverUrl
+	}
+
 	u, err := url.Parse(serverUrl)
 	if err != nil {
 		return serverUrl

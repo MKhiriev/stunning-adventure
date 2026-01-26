@@ -1,12 +1,15 @@
 package agent
 
 import (
+	"compress/gzip"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/MKhiriev/stunning-adventure/internal/config"
+	"github.com/MKhiriev/stunning-adventure/internal/utils"
 	"github.com/MKhiriev/stunning-adventure/models"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -14,7 +17,11 @@ import (
 )
 
 func TestReadMetrics(t *testing.T) {
-	agent := initAgent(t)
+	agent := initAgent(t, &config.AgentConfig{
+		ServerAddress:  "localhost:8099",
+		ReportInterval: 2,
+		PollInterval:   1,
+	})
 
 	type want struct {
 		moreThanZeroMetrics bool
@@ -50,15 +57,10 @@ func TestReadMetrics(t *testing.T) {
 }
 
 func TestSendMetrics(t *testing.T) {
-	agent := initAgent(t)
-
 	type want struct {
-		code          int
-		response      string
-		contentType   string
-		route         string
-		expectedDelta string
-		expectedValue string
+		code        int
+		contentType string
+		route       string
 	}
 	tests := []struct {
 		name       string
@@ -71,10 +73,9 @@ func TestSendMetrics(t *testing.T) {
 			metric:     models.Metrics{ID: "someMetric", MType: models.Counter, Delta: mDelta(527)},
 			httpMethod: http.MethodPost,
 			want: want{
-				code:          http.StatusOK,
-				contentType:   "text/plain",
-				route:         "/update/counter/someMetric/527",
-				expectedDelta: "527",
+				code:        http.StatusOK,
+				contentType: "application/json",
+				route:       "/update",
 			},
 		},
 		{
@@ -82,10 +83,9 @@ func TestSendMetrics(t *testing.T) {
 			metric:     models.Metrics{ID: "someMetric", MType: models.Gauge, Value: mValue(12779.105)},
 			httpMethod: http.MethodPost,
 			want: want{
-				code:          http.StatusOK,
-				contentType:   "text/plain",
-				route:         "/update/gauge/someMetric/12779.105",
-				expectedValue: "12779.105",
+				code:        http.StatusOK,
+				contentType: "application/json",
+				route:       "/update",
 			},
 		},
 		{
@@ -93,10 +93,9 @@ func TestSendMetrics(t *testing.T) {
 			metric:     models.Metrics{ID: "someMetric", MType: models.Gauge, Value: mValue(575962.373)},
 			httpMethod: http.MethodPost,
 			want: want{
-				code:          http.StatusOK,
-				contentType:   "text/plain",
-				route:         "/update/gauge/someMetric/575962.373",
-				expectedValue: "575962.373",
+				code:        http.StatusOK,
+				contentType: "application/json",
+				route:       "/update",
 			},
 		},
 		{
@@ -104,36 +103,49 @@ func TestSendMetrics(t *testing.T) {
 			metric:     models.Metrics{ID: "someMetric", MType: models.Gauge, Value: mValue(369111.063)},
 			httpMethod: http.MethodPost,
 			want: want{
-				code:          http.StatusOK,
-				contentType:   "text/plain",
-				route:         "/update/gauge/someMetric/369111.063",
-				expectedValue: "369111.063",
+				code:        http.StatusOK,
+				contentType: "application/json",
+				route:       "/update",
 			},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, test.httpMethod, r.Method)
+				assert.Equal(t, test.want.route, r.URL.Path)
+				assert.Equal(t, test.want.contentType, r.Header.Get("Content-Type"))
+				assert.Equal(t, "gzip", r.Header.Get("Content-Encoding"))
+
+				gzReader, err := gzip.NewReader(r.Body)
+				require.NoError(t, err)
+				defer gzReader.Close()
+
+				body, err := io.ReadAll(gzReader)
+				require.NoError(t, err)
+
+				var metrics []models.Metrics
+				err = json.Unmarshal(body, &metrics)
+				require.NoError(t, err)
+				require.Len(t, metrics, 1)
+				assert.Equal(t, test.metric, metrics[0])
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				_ = json.NewEncoder(w).Encode(models.Metrics{})
+			}))
+			defer server.Close()
+
+			cfg := &config.AgentConfig{
+				ServerAddress:  utils.ServerAddress(server.URL),
+				ReportInterval: 2,
+				PollInterval:   1,
+			}
+			agent := initAgent(t, cfg)
+
 			agent.memory.metrics = map[string]models.Metrics{
 				test.metric.ID: test.metric,
 			}
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				assert.NotEmpty(t, r.URL.Path, test.want.route)
-				assert.Contains(t, strings.Split(r.URL.Path, "/"), test.metric.ID)
-				assert.Contains(t, strings.Split(r.URL.Path, "/"), test.metric.MType)
-				if test.metric.MType == models.Counter {
-					assert.Contains(t, strings.Split(r.URL.Path, "/"), test.want.expectedDelta)
-				}
-				if test.metric.MType == models.Gauge {
-					assert.Contains(t, strings.Split(r.URL.Path, "/"), test.want.expectedValue)
-				}
-
-				assert.Equal(t, test.want.contentType, r.Header.Get("Content-Type"))
-
-				w.Header().Add("Content-Type", "text/plain")
-				w.WriteHeader(http.StatusOK)
-			}))
-			defer server.Close()
-			agent.serverAddress = server.URL
 
 			metrics := agent.memory.GetAllMetrics()
 			sendMetricsError := agent.sendMetrics(metrics...)
@@ -142,14 +154,9 @@ func TestSendMetrics(t *testing.T) {
 	}
 }
 
-func initAgent(t *testing.T) *MetricsAgent {
-	cfg := &config.AgentConfig{
-		ServerAddress:  "0.0.0.0:8081",
-		ReportInterval: 2,
-		PollInterval:   1,
-	}
-
-	agent, err := NewMetricsAgent("update", nil, cfg, &zerolog.Logger{})
+func initAgent(t *testing.T, cfg *config.AgentConfig) *MetricsAgent {
+	logger := zerolog.Nop()
+	agent, err := NewMetricsAgent("update", nil, cfg, &logger)
 	require.NoError(t, err, "failed to create metrics agent")
 
 	return agent
