@@ -38,6 +38,8 @@ func NewHTTPMetricsSender(serverAddress, route string, retryIntervals map[int]ti
 		return nil, fmt.Errorf("unable to get real agent IP: %w", err)
 	}
 
+	httpClient.SetBaseURL("http://" + serverAddress)
+
 	return &HTTPMetricsSender{
 		route:     route,
 		client:    httpClient,

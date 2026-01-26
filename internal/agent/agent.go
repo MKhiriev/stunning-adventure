@@ -5,7 +5,6 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
-	"net/url"
 	"os/signal"
 	"runtime"
 	"sync"
@@ -207,14 +206,7 @@ func createHTTPMetricsSender(route string, retryIntervals map[int]time.Duration,
 		return nil, fmt.Errorf("invalid server address: %w", err)
 	}
 
-	serverAddress := fmt.Sprintf("%s%s", "http://", cfg.ServerAddress)
-
-	sendTo, pathJoinError := url.JoinPath(serverAddress, route, "/")
-	if pathJoinError != nil {
-		return nil, fmt.Errorf("error constructing route for sending metrics: %w", pathJoinError)
-	}
-
-	client, err := NewHTTPMetricsSender(cfg.ServerAddress, sendTo, retryIntervals, hasher, publicKey, logger)
+	client, err := NewHTTPMetricsSender(cfg.ServerAddress, route, retryIntervals, hasher, publicKey, logger)
 	if err != nil {
 		return nil, fmt.Errorf("unexpected error creating agent metrics sender: %w", err)
 	}
