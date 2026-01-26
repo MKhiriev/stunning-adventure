@@ -39,20 +39,20 @@ func CheckIfValidIPAddress(address string) error {
 
 	_, err := net.ResolveIPAddr("ip", ip)
 	if err != nil {
-		return fmt.Errorf("incorrect ip: %v\n", err)
+		return fmt.Errorf("incorrect ip: %v", err)
 	}
 
 	return nil
 }
 
-func ServerAddress(serverUrl string) string {
-	if !strings.Contains(serverUrl, "://") {
-		return serverUrl
+func ServerAddress(serverURL string) string {
+	if !strings.Contains(serverURL, "://") {
+		return serverURL
 	}
 
-	u, err := url.Parse(serverUrl)
+	u, err := url.Parse(serverURL)
 	if err != nil {
-		return serverUrl
+		return serverURL
 	}
 
 	return u.Host

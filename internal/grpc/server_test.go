@@ -400,10 +400,12 @@ func TestUpdateMetrics_ContextPropagation(t *testing.T) {
 	request := &proto.UpdateMetricsRequest{}
 	request.SetMetrics([]*proto.Metric{protoMetric})
 
-	ctx := context.WithValue(context.Background(), "test_key", "test_value")
+	type testKey string
+
+	ctx := context.WithValue(context.Background(), testKey("test_key"), "test_value")
 
 	mockService.On("SaveAll", mock.MatchedBy(func(c context.Context) bool {
-		return c.Value("test_key") == "test_value"
+		return c.Value(testKey("test_key")) == "test_value"
 	}), mock.Anything).Return(nil)
 
 	response, err := server.UpdateMetrics(ctx, request)

@@ -34,7 +34,7 @@ type MetricsAgent struct {
 	hasher         *utils.Hasher
 	rateLimit      int64
 	publicKey      *rsa.PublicKey // public key to encrypt message
-	realIpAddress  string
+	realIPAddress  string
 }
 
 // NewMetricsAgent initializes and returns a new MetricsAgent with configuration values.

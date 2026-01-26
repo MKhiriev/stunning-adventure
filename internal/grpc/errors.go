@@ -14,8 +14,8 @@ var (
 	errUnexpectedError   = status.Error(codes.Unknown, "invalid metric(s)")
 
 	errMissingMetadata       = status.Error(codes.PermissionDenied, "missing metadata")
-	errMissingRealIpMetadata = status.Error(codes.PermissionDenied, "missing X-Real-IP in metadata")
-	errEmptyRealIpMetadata   = status.Error(codes.PermissionDenied, "X-Real-IP is empty")
+	errMissingRealIPMetadata = status.Error(codes.PermissionDenied, "missing X-Real-IP in metadata")
+	errEmptyRealIPMetadata   = status.Error(codes.PermissionDenied, "X-Real-IP is empty")
 
 	errInvalidIPAddress     = status.Error(codes.PermissionDenied, "invalid IP address")
 	errNotFromTrustedSubnet = status.Error(codes.PermissionDenied, "IP address not in trusted subnet")

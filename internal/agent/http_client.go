@@ -33,7 +33,7 @@ func NewHTTPMetricsSender(serverAddress, route string, retryIntervals map[int]ti
 			return retryIntervals[response.Request.Attempt], nil
 		}).SetRetryMaxWaitTime(5 * time.Second)
 
-	realIp, err := utils.GetLocalIP(serverAddress)
+	realIP, err := utils.GetLocalIP(serverAddress)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get real agent IP: %w", err)
 	}
@@ -46,7 +46,7 @@ func NewHTTPMetricsSender(serverAddress, route string, retryIntervals map[int]ti
 		hasher:    hasher,
 		publicKey: publicKey,
 		logger:    logger,
-		realIP:    realIp.String(),
+		realIP:    realIP.String(),
 	}, nil
 }
 

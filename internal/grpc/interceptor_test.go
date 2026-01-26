@@ -244,7 +244,7 @@ func TestTrustedSubnetInterceptor_Error_MissingXRealIP(t *testing.T) {
 	resp, err := interceptor(ctx, nil, &grpc.UnaryServerInfo{}, handler)
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, errMissingRealIpMetadata)
+	assert.ErrorIs(t, err, errMissingRealIPMetadata)
 	assert.Nil(t, resp)
 	assert.False(t, handlerCalled)
 }
@@ -270,7 +270,7 @@ func TestTrustedSubnetInterceptor_Error_EmptyXRealIP(t *testing.T) {
 	resp, err := interceptor(ctx, nil, &grpc.UnaryServerInfo{}, handler)
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, errEmptyRealIpMetadata)
+	assert.ErrorIs(t, err, errEmptyRealIPMetadata)
 	assert.Nil(t, resp)
 	assert.False(t, handlerCalled)
 }
@@ -588,13 +588,14 @@ func TestTrustedSubnetInterceptor_ContextPropagation(t *testing.T) {
 	md := metadata.New(map[string]string{
 		"X-Real-IP": "192.168.1.100",
 	})
+	type testKey string
 	ctx := metadata.NewIncomingContext(context.Background(), md)
-	ctx = context.WithValue(ctx, "test_key", "test_value")
+	ctx = context.WithValue(ctx, testKey("test_key"), "test_value")
 
 	handlerReceivedContext := false
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		// Verify context is propagated
-		if ctx.Value("test_key") == "test_value" {
+		if ctx.Value(testKey("test_key")) == "test_value" {
 			handlerReceivedContext = true
 		}
 		return "success", nil
