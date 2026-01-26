@@ -62,7 +62,7 @@ func (h *Handler) Init() *chi.Mux {
 	router.Use(middleware.Recoverer)
 
 	if h.trustedSubnet != nil {
-		router.Use(h.CheckIPTrustedSubnet) // todo wrap in if statement
+		router.Use(h.CheckIPTrustedSubnet)
 	}
 
 	router.Use(h.WithLogging)
