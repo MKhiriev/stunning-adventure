@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"strings"
 	"time"
 
@@ -17,6 +18,8 @@ func NewHTTPClient(timeout time.Duration) *resty.Client {
 }
 
 func GetLocalIP(address string) (net.IP, error) {
+	address = serverAddress(address)
+
 	conn, err := net.Dial("udp4", address)
 	if err != nil {
 		return nil, fmt.Errorf("error dialing server: %w", err)
@@ -40,4 +43,13 @@ func CheckIfValidIPAddress(address string) error {
 	}
 
 	return nil
+}
+
+func serverAddress(serverUrl string) string {
+	u, err := url.Parse(serverUrl)
+	if err != nil {
+		return serverUrl
+	}
+
+	return u.Host
 }

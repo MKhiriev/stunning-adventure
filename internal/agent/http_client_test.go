@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -41,11 +42,16 @@ func TestNewHTTPMetricsSender(t *testing.T) {
 
 func TestHTTPMetricsSender_sendMetrics_NoMetrics(t *testing.T) {
 	logger := zerolog.Nop()
-	sender := &HTTPMetricsSender{
-		logger: &logger,
+	retryIntervals := map[int]time.Duration{
+		1: 1 * time.Second,
+		2: 3 * time.Second,
+		3: 5 * time.Second,
 	}
 
-	err := sender.sendMetrics()
+	sender, err := NewHTTPMetricsSender("127.0.0.1:8081", "/update/", retryIntervals, nil, nil, &logger)
+	require.NoError(t, err)
+
+	err = sender.sendMetrics()
 	assert.NotNil(t, err)
 	assert.Error(t, err)
 	assert.Equal(t, "no metric was passed", err.Error())
@@ -89,14 +95,17 @@ func TestHTTPMetricsSender_sendMetrics_Success(t *testing.T) {
 		Value: &gaugeValue,
 	}
 
-	sender := &HTTPMetricsSender{
-		route:  "/update/",
-		client: client,
-		logger: &logger,
-		realIP: "127.0.0.1",
+	retryIntervals := map[int]time.Duration{
+		1: 1 * time.Second,
+		2: 3 * time.Second,
+		3: 5 * time.Second,
 	}
 
-	err := sender.sendMetrics(metric)
+	sender, err := NewHTTPMetricsSender("127.0.0.1:8081", "/update/", retryIntervals, nil, nil, &logger)
+	require.NoError(t, err)
+	sender.client = client
+
+	err = sender.sendMetrics(metric)
 	assert.NoError(t, err)
 }
 
@@ -114,6 +123,12 @@ func TestHTTPMetricsSender_sendMetrics_WithHasher(t *testing.T) {
 	client := utils.NewHTTPClient(5 * time.Second)
 	client.SetBaseURL(server.URL)
 
+	retryIntervals := map[int]time.Duration{
+		1: 1 * time.Second,
+		2: 3 * time.Second,
+		3: 5 * time.Second,
+	}
+
 	counterValue := int64(42)
 	metric := models.Metrics{
 		ID:    "test_counter",
@@ -121,15 +136,11 @@ func TestHTTPMetricsSender_sendMetrics_WithHasher(t *testing.T) {
 		Delta: &counterValue,
 	}
 
-	sender := &HTTPMetricsSender{
-		route:  "/update/",
-		client: client,
-		hasher: hasher,
-		logger: &logger,
-		realIP: "127.0.0.1",
-	}
+	sender, err := NewHTTPMetricsSender("127.0.0.1:8081", "/update/", retryIntervals, hasher, nil, &logger)
+	require.NoError(t, err)
+	sender.client = client
 
-	err := sender.sendMetrics(metric)
+	err = sender.sendMetrics(metric)
 	assert.NoError(t, err)
 }
 
@@ -160,13 +171,15 @@ func TestHTTPMetricsSender_sendMetrics_WithEncryption(t *testing.T) {
 		Value: &gaugeValue,
 	}
 
-	sender := &HTTPMetricsSender{
-		route:     "/update/",
-		client:    client,
-		publicKey: publicKey,
-		logger:    &logger,
-		realIP:    "127.0.0.1",
+	retryIntervals := map[int]time.Duration{
+		1: 1 * time.Second,
+		2: 3 * time.Second,
+		3: 5 * time.Second,
 	}
+
+	sender, err := NewHTTPMetricsSender("127.0.0.1:8081", "/update/", retryIntervals, nil, publicKey, &logger)
+	require.NoError(t, err)
+	sender.client = client
 
 	err = sender.sendMetrics(metric)
 	assert.NoError(t, err)
@@ -193,8 +206,11 @@ func TestHTTPMetricsSender_sendMetrics_MultipleMetrics(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := utils.NewHTTPClient(5 * time.Second)
-	client.SetBaseURL(server.URL)
+	retryIntervals := map[int]time.Duration{
+		1: 1 * time.Second,
+		2: 3 * time.Second,
+		3: 5 * time.Second,
+	}
 
 	gaugeValue1 := 1.1
 	gaugeValue2 := 2.2
@@ -206,14 +222,10 @@ func TestHTTPMetricsSender_sendMetrics_MultipleMetrics(t *testing.T) {
 		{ID: "counter1", MType: models.Counter, Delta: &counterValue},
 	}
 
-	sender := &HTTPMetricsSender{
-		route:  "/update/",
-		client: client,
-		logger: &logger,
-		realIP: "127.0.0.1",
-	}
+	sender, err := NewHTTPMetricsSender(serverAddress(server.URL), "/update/", retryIntervals, nil, nil, &logger)
+	require.NoError(t, err)
 
-	err := sender.sendMetrics(metrics...)
+	err = sender.sendMetrics(metrics...)
 	assert.NoError(t, err)
 }
 
@@ -240,6 +252,12 @@ func TestHTTPMetricsSender_sendMetrics_WithHasherAndEncryption(t *testing.T) {
 	client := utils.NewHTTPClient(5 * time.Second)
 	client.SetBaseURL(server.URL)
 
+	retryIntervals := map[int]time.Duration{
+		1: 1 * time.Second,
+		2: 3 * time.Second,
+		3: 5 * time.Second,
+	}
+
 	gaugeValue := 55.55
 	counterValue := int64(100)
 
@@ -248,14 +266,9 @@ func TestHTTPMetricsSender_sendMetrics_WithHasherAndEncryption(t *testing.T) {
 		{ID: "counter_encrypted", MType: models.Counter, Delta: &counterValue},
 	}
 
-	sender := &HTTPMetricsSender{
-		route:     "/update/",
-		client:    client,
-		hasher:    hasher,
-		publicKey: publicKey,
-		logger:    &logger,
-		realIP:    "192.168.1.1",
-	}
+	sender, err := NewHTTPMetricsSender("127.0.0.1:8081", "/update/", retryIntervals, hasher, publicKey, &logger)
+	require.NoError(t, err)
+	sender.client = client
 
 	err = sender.sendMetrics(metrics...)
 	assert.NoError(t, err)
@@ -313,4 +326,81 @@ func Test_gzipCompress(t *testing.T) {
 			assert.Equal(t, tt.metrics, decodedMetrics)
 		})
 	}
+}
+
+func TestServerAddress(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			name: "http_url",
+			in:   "http://127.0.1.24:8089",
+			want: "127.0.1.24:8089",
+		},
+		{
+			name: "https_url",
+			in:   "https://example.com:443",
+			want: "example.com:443",
+		},
+		{
+			name: "host_only_no_scheme",
+			in:   "127.0.0.1:57080",
+			want: "127.0.0.1:57080",
+		},
+		{
+			name: "scheme_without_host",
+			in:   "http://",
+			want: "",
+		},
+		{
+			name: "path_query_fragment",
+			in:   "http://127.0.1.24:8089/a/b?x=1#z",
+			want: "127.0.1.24:8089",
+		},
+		{
+			name: "ipv6",
+			in:   "http://[::1]:8080",
+			want: "[::1]:8080",
+		},
+		{
+			name: "userinfo",
+			in:   "http://user:pass@127.0.1.24:8089",
+			want: "127.0.1.24:8089",
+		},
+		{
+			name: "empty",
+			in:   "",
+			want: "",
+		},
+		{
+			name: "just_path",
+			in:   "/api",
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := serverAddress(tt.in)
+			if got != tt.want {
+				t.Fatalf("serverAddress(%q) = %q; want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func serverAddress(serverUrl string) string {
+	u, err := url.Parse(serverUrl)
+	if err != nil {
+		return serverUrl
+	}
+
+	return u.Host
 }
