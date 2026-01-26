@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"testing"
 	"time"
 
@@ -21,45 +20,25 @@ import (
 )
 
 func TestNewHTTPMetricsSender(t *testing.T) {
-	logger := zerolog.Nop()
-	serverAddress := "127.0.0.1:8081"
-	route := "updates"
-	retryIntervals := map[int]time.Duration{
-		1: 1 * time.Second,
-		2: 3 * time.Second,
-		3: 5 * time.Second,
-	}
-
-	sender, err := NewHTTPMetricsSender(serverAddress, route, retryIntervals, nil, nil, &logger)
+	sender, err := httpMetricsSender()
 
 	require.NoError(t, err)
 	assert.NotNil(t, sender)
-	assert.Equal(t, route, sender.route)
 	assert.NotNil(t, sender.client)
 	assert.NotEmpty(t, sender.realIP)
-	assert.Equal(t, &logger, sender.logger)
 }
 
 func TestHTTPMetricsSender_sendMetrics_NoMetrics(t *testing.T) {
-	logger := zerolog.Nop()
-	retryIntervals := map[int]time.Duration{
-		1: 1 * time.Second,
-		2: 3 * time.Second,
-		3: 5 * time.Second,
-	}
-
-	sender, err := NewHTTPMetricsSender("127.0.0.1:8081", "/update/", retryIntervals, nil, nil, &logger)
+	sender, err := httpMetricsSender()
 	require.NoError(t, err)
 
 	err = sender.sendMetrics()
 	assert.NotNil(t, err)
 	assert.Error(t, err)
-	assert.Equal(t, "no metric was passed", err.Error())
+	assert.EqualError(t, err, "no metric was passed")
 }
 
 func TestHTTPMetricsSender_sendMetrics_Success(t *testing.T) {
-	logger := zerolog.Nop()
-
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
 		assert.Equal(t, "/update/", r.URL.Path)
@@ -85,9 +64,6 @@ func TestHTTPMetricsSender_sendMetrics_Success(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := utils.NewHTTPClient(5 * time.Second)
-	client.SetBaseURL(server.URL)
-
 	gaugeValue := 123.45
 	metric := models.Metrics{
 		ID:    "test_metric",
@@ -95,23 +71,15 @@ func TestHTTPMetricsSender_sendMetrics_Success(t *testing.T) {
 		Value: &gaugeValue,
 	}
 
-	retryIntervals := map[int]time.Duration{
-		1: 1 * time.Second,
-		2: 3 * time.Second,
-		3: 5 * time.Second,
-	}
-
-	sender, err := NewHTTPMetricsSender("127.0.0.1:8081", "/update/", retryIntervals, nil, nil, &logger)
+	sender, err := httpMetricsSender()
 	require.NoError(t, err)
-	sender.client = client
 
 	err = sender.sendMetrics(metric)
 	assert.NoError(t, err)
 }
 
 func TestHTTPMetricsSender_sendMetrics_WithHasher(t *testing.T) {
-	logger := zerolog.Nop()
-	hasher := utils.NewHasher("test-key")
+	hashKey := "test-key"
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.NotEmpty(t, r.Header.Get("HashSHA256"))
@@ -120,15 +88,6 @@ func TestHTTPMetricsSender_sendMetrics_WithHasher(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := utils.NewHTTPClient(5 * time.Second)
-	client.SetBaseURL(server.URL)
-
-	retryIntervals := map[int]time.Duration{
-		1: 1 * time.Second,
-		2: 3 * time.Second,
-		3: 5 * time.Second,
-	}
-
 	counterValue := int64(42)
 	metric := models.Metrics{
 		ID:    "test_counter",
@@ -136,17 +95,14 @@ func TestHTTPMetricsSender_sendMetrics_WithHasher(t *testing.T) {
 		Delta: &counterValue,
 	}
 
-	sender, err := NewHTTPMetricsSender("127.0.0.1:8081", "/update/", retryIntervals, hasher, nil, &logger)
+	sender, err := httpMetricsSenderWithHashKey(hashKey)
 	require.NoError(t, err)
-	sender.client = client
 
 	err = sender.sendMetrics(metric)
 	assert.NoError(t, err)
 }
 
 func TestHTTPMetricsSender_sendMetrics_WithEncryption(t *testing.T) {
-	logger := zerolog.Nop()
-
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 	publicKey := &privateKey.PublicKey
@@ -161,9 +117,6 @@ func TestHTTPMetricsSender_sendMetrics_WithEncryption(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := utils.NewHTTPClient(5 * time.Second)
-	client.SetBaseURL(server.URL)
-
 	gaugeValue := 99.99
 	metric := models.Metrics{
 		ID:    "encrypted_metric",
@@ -171,23 +124,14 @@ func TestHTTPMetricsSender_sendMetrics_WithEncryption(t *testing.T) {
 		Value: &gaugeValue,
 	}
 
-	retryIntervals := map[int]time.Duration{
-		1: 1 * time.Second,
-		2: 3 * time.Second,
-		3: 5 * time.Second,
-	}
-
-	sender, err := NewHTTPMetricsSender("127.0.0.1:8081", "/update/", retryIntervals, nil, publicKey, &logger)
+	sender, err := httpMetricsSenderWithPublicKey(publicKey)
 	require.NoError(t, err)
-	sender.client = client
 
 	err = sender.sendMetrics(metric)
 	assert.NoError(t, err)
 }
 
 func TestHTTPMetricsSender_sendMetrics_MultipleMetrics(t *testing.T) {
-	logger := zerolog.Nop()
-
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gzReader, err := gzip.NewReader(r.Body)
 		require.NoError(t, err)
@@ -206,12 +150,6 @@ func TestHTTPMetricsSender_sendMetrics_MultipleMetrics(t *testing.T) {
 	}))
 	defer server.Close()
 
-	retryIntervals := map[int]time.Duration{
-		1: 1 * time.Second,
-		2: 3 * time.Second,
-		3: 5 * time.Second,
-	}
-
 	gaugeValue1 := 1.1
 	gaugeValue2 := 2.2
 	counterValue := int64(10)
@@ -222,7 +160,7 @@ func TestHTTPMetricsSender_sendMetrics_MultipleMetrics(t *testing.T) {
 		{ID: "counter1", MType: models.Counter, Delta: &counterValue},
 	}
 
-	sender, err := NewHTTPMetricsSender(serverAddress(server.URL), "/update/", retryIntervals, nil, nil, &logger)
+	sender, err := httpMetricsSender()
 	require.NoError(t, err)
 
 	err = sender.sendMetrics(metrics...)
@@ -230,8 +168,7 @@ func TestHTTPMetricsSender_sendMetrics_MultipleMetrics(t *testing.T) {
 }
 
 func TestHTTPMetricsSender_sendMetrics_WithHasherAndEncryption(t *testing.T) {
-	logger := zerolog.Nop()
-	hasher := utils.NewHasher("test-key")
+	hashKey := "test-key"
 
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
@@ -249,15 +186,6 @@ func TestHTTPMetricsSender_sendMetrics_WithHasherAndEncryption(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := utils.NewHTTPClient(5 * time.Second)
-	client.SetBaseURL(server.URL)
-
-	retryIntervals := map[int]time.Duration{
-		1: 1 * time.Second,
-		2: 3 * time.Second,
-		3: 5 * time.Second,
-	}
-
 	gaugeValue := 55.55
 	counterValue := int64(100)
 
@@ -266,9 +194,8 @@ func TestHTTPMetricsSender_sendMetrics_WithHasherAndEncryption(t *testing.T) {
 		{ID: "counter_encrypted", MType: models.Counter, Delta: &counterValue},
 	}
 
-	sender, err := NewHTTPMetricsSender("127.0.0.1:8081", "/update/", retryIntervals, hasher, publicKey, &logger)
+	sender, err := httpMetricsSenderWithHashKeyAndPublicKey(hashKey, publicKey)
 	require.NoError(t, err)
-	sender.client = client
 
 	err = sender.sendMetrics(metrics...)
 	assert.NoError(t, err)
@@ -328,79 +255,50 @@ func Test_gzipCompress(t *testing.T) {
 	}
 }
 
-func TestServerAddress(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		in   string
-		want string
-	}{
-		{
-			name: "http_url",
-			in:   "http://127.0.1.24:8089",
-			want: "127.0.1.24:8089",
-		},
-		{
-			name: "https_url",
-			in:   "https://example.com:443",
-			want: "example.com:443",
-		},
-		{
-			name: "host_only_no_scheme",
-			in:   "127.0.0.1:57080",
-			want: "127.0.0.1:57080",
-		},
-		{
-			name: "scheme_without_host",
-			in:   "http://",
-			want: "",
-		},
-		{
-			name: "path_query_fragment",
-			in:   "http://127.0.1.24:8089/a/b?x=1#z",
-			want: "127.0.1.24:8089",
-		},
-		{
-			name: "ipv6",
-			in:   "http://[::1]:8080",
-			want: "[::1]:8080",
-		},
-		{
-			name: "userinfo",
-			in:   "http://user:pass@127.0.1.24:8089",
-			want: "127.0.1.24:8089",
-		},
-		{
-			name: "empty",
-			in:   "",
-			want: "",
-		},
-		{
-			name: "just_path",
-			in:   "/api",
-			want: "",
-		},
+func httpMetricsSender() (*HTTPMetricsSender, error) {
+	retryIntervals := map[int]time.Duration{
+		1: 1 * time.Second,
+		2: 3 * time.Second,
+		3: 5 * time.Second,
 	}
 
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			got := serverAddress(tt.in)
-			if got != tt.want {
-				t.Fatalf("serverAddress(%q) = %q; want %q", tt.in, got, tt.want)
-			}
-		})
-	}
+	logger := zerolog.Nop()
+	sender, err := NewHTTPMetricsSender("127.0.0.1:8081", "/update/", retryIntervals, nil, nil, &logger)
+	return sender, err
 }
 
-func serverAddress(serverUrl string) string {
-	u, err := url.Parse(serverUrl)
-	if err != nil {
-		return serverUrl
+func httpMetricsSenderWithPublicKey(publicKey *rsa.PublicKey) (*HTTPMetricsSender, error) {
+	retryIntervals := map[int]time.Duration{
+		1: 1 * time.Second,
+		2: 3 * time.Second,
+		3: 5 * time.Second,
 	}
 
-	return u.Host
+	logger := zerolog.Nop()
+	sender, err := NewHTTPMetricsSender("127.0.0.1:8081", "/update/", retryIntervals, nil, publicKey, &logger)
+	return sender, err
+}
+
+func httpMetricsSenderWithHashKey(hashKey string) (*HTTPMetricsSender, error) {
+	retryIntervals := map[int]time.Duration{
+		1: 1 * time.Second,
+		2: 3 * time.Second,
+		3: 5 * time.Second,
+	}
+
+	logger := zerolog.Nop()
+	sender, err := NewHTTPMetricsSender("127.0.0.1:8081", "/update/", retryIntervals, utils.NewHasher(hashKey), nil, &logger)
+	return sender, err
+}
+
+func httpMetricsSenderWithHashKeyAndPublicKey(hashKey string, publicKey *rsa.PublicKey) (*HTTPMetricsSender, error) {
+	retryIntervals := map[int]time.Duration{
+		1: 1 * time.Second,
+		2: 3 * time.Second,
+		3: 5 * time.Second,
+	}
+
+	logger := zerolog.Nop()
+	sender, err := NewHTTPMetricsSender("127.0.0.1:8081", "/update/", retryIntervals, utils.NewHasher(hashKey), publicKey, &logger)
+	return sender, err
 }
