@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/MKhiriev/stunning-adventure/internal/utils"
@@ -14,6 +16,8 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/rs/zerolog"
 )
+
+const schema = "http://"
 
 type HTTPMetricsSender struct {
 	route  string        // server route for sending metrics
@@ -38,10 +42,13 @@ func NewHTTPMetricsSender(serverAddress, route string, retryIntervals map[int]ti
 		return nil, fmt.Errorf("unable to get real agent IP: %w", err)
 	}
 
-	httpClient.SetBaseURL("http://" + serverAddress)
+	routeWithScheme, err := getRoute(serverAddress, route)
+	if err != nil {
+		return nil, err
+	}
 
 	return &HTTPMetricsSender{
-		route:     route,
+		route:     routeWithScheme,
 		client:    httpClient,
 		hasher:    hasher,
 		publicKey: publicKey,
@@ -76,7 +83,7 @@ func (m *HTTPMetricsSender) sendMetrics(metrics ...models.Metrics) error {
 	if m.hasher != nil {
 		hashedMetric, hashingError := m.hasher.HashMetrics(metrics...)
 		if hashingError != nil {
-			m.logger.Err(hashingError).Caller().Str("func", "*HTTPMetricsSender.sendMetrics").Msg("error occurred during hashing metric")
+			m.logger.Err(hashingError).Str("func", "*HTTPMetricsSender.sendMetrics").Msg("error occurred during hashing metric")
 			return hashingError
 		}
 		headers["HashSHA256"] = fmt.Sprintf("%x", hashedMetric)
@@ -85,7 +92,7 @@ func (m *HTTPMetricsSender) sendMetrics(metrics ...models.Metrics) error {
 	// gzip encode metric
 	compressedMetric, compressionError := gzipCompress(metrics...)
 	if compressionError != nil {
-		m.logger.Err(compressionError).Caller().Str("func", "*HTTPMetricsSender.sendMetrics").Msg("error occurred during gzip compression")
+		m.logger.Err(compressionError).Str("func", "*HTTPMetricsSender.sendMetrics").Msg("error occurred during gzip compression")
 		return compressionError
 	}
 
@@ -98,21 +105,26 @@ func (m *HTTPMetricsSender) sendMetrics(metrics ...models.Metrics) error {
 		compressedMetric = encryptedMessage.Bytes()
 	}
 
-	m.logger.Debug().Any("metric", metrics).Any("headers", headers).Send()
-
-	var response models.Metrics
-	_, sendMetricError := m.client.R().
+	resp, sendMetricError := m.client.R().
 		SetHeaders(headers).
 		SetBody(compressedMetric).
-		SetResult(&response).
 		Post(m.route)
 
 	if sendMetricError != nil {
-		m.logger.Err(sendMetricError).Caller().Str("func", "*MetricsAgent.sendMetrics").Msg("error occurred during sending metric")
+		m.logger.Err(sendMetricError).
+			Str("func", "*MetricsAgent.sendMetrics").
+			Msg("error occurred during sending metric")
 		return fmt.Errorf("error occurred during sending metric: %w", sendMetricError)
 	}
+	if resp.StatusCode() != http.StatusOK {
+		m.logger.Error().
+			Str("func", "*MetricsAgent.sendMetrics").
+			Str("status", resp.Status()).
+			Msg("request status is not 200 OK")
+		return fmt.Errorf("failed to send metrics with status: %s", resp.Status())
+	}
 
-	m.logger.Info().Caller().Str("func", "*MetricsAgent.sendMetrics").Any("request", compressedMetric).Any("response", response).Msg("metric is sent!")
+	m.logger.Info().Str("func", "*MetricsAgent.sendMetrics").Msg("metrics are sent successfully!")
 	return nil
 }
 
@@ -137,4 +149,15 @@ func gzipCompress(metrics ...models.Metrics) ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
+}
+
+func getRoute(serverAddress, route string) (string, error) {
+	serverAddress = schema + serverAddress
+
+	routeWithScheme, pathJoinError := url.JoinPath(serverAddress, route, "/")
+	if pathJoinError != nil {
+		return "", fmt.Errorf("error getting route for HTTP metrics sender: %w", pathJoinError)
+	}
+
+	return routeWithScheme, nil
 }
