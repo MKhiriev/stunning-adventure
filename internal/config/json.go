@@ -19,16 +19,17 @@ type agentJSONConfig struct {
 }
 
 type serverJSONConfig struct {
-	ServerAddress string         `json:"address"`        // network address to bind the server
-	StoreInterval utils.Duration `json:"store_interval"` // interval in seconds to persist metrics to storage
-
-	FileStoragePath        string `json:"store_file"`   // file path for metric storage
-	RestoreMetricsFromFile bool   `json:"restore"`      // flag to restore metrics from file on startup
-	DatabaseDSN            string `json:"database_dsn"` // database connection string
-	HashKey                string `json:"hash_key"`     // key used for hashing metric payloads
-	AuditFile              string `json:"audit_file"`   // local file path for audit logs
-	AuditURL               string `json:"audit_url"`    // external URL to send audit logs
-	PrivateCryptoKeyPath   string `json:"crypto_key"`   // private key path for decryption of data from agent
+	ServerAddress          string         `json:"address"`        // network address to bind the server
+	GrpcServerAddress      string         `json:"grpc_address"`   // network address to bind the GRPC server
+	StoreInterval          utils.Duration `json:"store_interval"` // interval in seconds to persist metrics to storage
+	FileStoragePath        string         `json:"store_file"`     // file path for metric storage
+	RestoreMetricsFromFile bool           `json:"restore"`        // flag to restore metrics from file on startup
+	DatabaseDSN            string         `json:"database_dsn"`   // database connection string
+	HashKey                string         `json:"hash_key"`       // key used for hashing metric payloads
+	AuditFile              string         `json:"audit_file"`     // local file path for audit logs
+	AuditURL               string         `json:"audit_url"`      // external URL to send audit logs
+	PrivateCryptoKeyPath   string         `json:"crypto_key"`     // private key path for decryption of data from agent
+	TrustedSubnet          string         `json:"trusted_subnet"` // CIDR of the trusted subnet; accepts requests only from within this subnet
 }
 
 func parseAgentJSON(jsonFilePath string) (*AgentConfig, error) {
@@ -65,6 +66,7 @@ func parseServerJSON(jsonFilePath string) (*ServerConfig, error) {
 
 	return &ServerConfig{
 		ServerAddress:          jsonCfg.ServerAddress,
+		GrpcServerAddress:      jsonCfg.GrpcServerAddress,
 		StoreInterval:          int64(jsonCfg.StoreInterval.Seconds()),
 		FileStoragePath:        jsonCfg.FileStoragePath,
 		RestoreMetricsFromFile: jsonCfg.RestoreMetricsFromFile,
@@ -73,5 +75,6 @@ func parseServerJSON(jsonFilePath string) (*ServerConfig, error) {
 		AuditFile:              jsonCfg.AuditFile,
 		AuditURL:               jsonCfg.AuditURL,
 		PrivateCryptoKeyPath:   jsonCfg.PrivateCryptoKeyPath,
+		TrustedSubnet:          jsonCfg.TrustedSubnet,
 	}, nil
 }

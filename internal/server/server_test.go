@@ -10,7 +10,7 @@ import (
 	"github.com/MKhiriev/stunning-adventure/internal/config"
 )
 
-func TestServerRun_ShutdownGracefully(t *testing.T) {
+func TestHTTPServerRun_ShutdownGracefully(t *testing.T) {
 	s := &Server{}
 
 	// минимальный сервер, просто отвечает 200 OK
@@ -21,11 +21,12 @@ func TestServerRun_ShutdownGracefully(t *testing.T) {
 	cfg := &config.ServerConfig{
 		ServerAddress: "127.0.0.1:0", // :0 -> случайный порт
 	}
+	s.HTTPServer(handler, cfg)
 
 	// запускаем сервер в отдельной горутине
 	done := make(chan error, 1)
 	go func() {
-		err := s.ServerRun(handler, cfg)
+		err := s.ServerRun()
 		done <- err
 	}()
 

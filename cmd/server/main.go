@@ -11,16 +11,22 @@ package main
 import (
 	"context"
 	"crypto/rsa"
+	"errors"
 	"fmt"
+	"net"
 
 	"github.com/MKhiriev/stunning-adventure/internal/adapters"
 	"github.com/MKhiriev/stunning-adventure/internal/config"
+	myGrpc "github.com/MKhiriev/stunning-adventure/internal/grpc"
 	"github.com/MKhiriev/stunning-adventure/internal/handlers"
 	"github.com/MKhiriev/stunning-adventure/internal/logger"
+	myProto "github.com/MKhiriev/stunning-adventure/internal/proto"
 	"github.com/MKhiriev/stunning-adventure/internal/server"
 	"github.com/MKhiriev/stunning-adventure/internal/service"
 	"github.com/MKhiriev/stunning-adventure/internal/store"
 	"github.com/MKhiriev/stunning-adventure/internal/utils"
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -80,9 +86,10 @@ func main() {
 		}
 	}
 
-	handler := handlers.NewHandler(metricsService, pingService, auditService, privateKey, cfg, log)
 	myServer := new(server.Server)
-	myServer.ServerRun(handler.Init(), cfg)
+	setupServer(myServer, metricsService, pingService, auditService, privateKey, cfg, log)
+
+	myServer.ServerRun()
 }
 
 func printBuildInfo() {
@@ -101,4 +108,72 @@ func printBuildInfo() {
 	fmt.Printf("Build version: %s\n", buildVersion)
 	fmt.Printf("Build date: %s\n", buildDate)
 	fmt.Printf("Build commit: %s\n", buildCommit)
+}
+
+func setupServer(server *server.Server, metricsService service.MetricsService, pingService service.PingService, auditService service.AuditPublisher, privateKey *rsa.PrivateKey, cfg *config.ServerConfig, log *zerolog.Logger) {
+	if cfg.GrpcServerAddress == "" && cfg.ServerAddress == "" {
+		log.Fatal().Msgf("no server was specified!")
+	}
+	if cfg.GrpcServerAddress != "" && cfg.GrpcServerAddress == cfg.ServerAddress {
+		log.Fatal().Msgf("gRPC and HTTP servers have the same port")
+	}
+
+	if cfg.GrpcServerAddress != "" {
+		grpcServer, lis, err := getGRPCServer(metricsService, cfg, log)
+		if err != nil {
+			log.Fatal().Msgf("grpc server setup fail: %v", err)
+		}
+
+		server.GRPCServer(grpcServer, lis)
+	}
+	if cfg.ServerAddress != "" {
+		httpServerHandler, err := getHTTPServerHandler(metricsService, pingService, auditService, privateKey, cfg, log)
+		if err != nil {
+			log.Fatal().Msgf("http server setup fail: %v", err)
+		}
+
+		server.HTTPServer(httpServerHandler.Init(), cfg)
+	}
+}
+
+func getHTTPServerHandler(metricsService service.MetricsService, pingService service.PingService, auditService service.AuditPublisher, privateKey *rsa.PrivateKey, cfg *config.ServerConfig, log *zerolog.Logger) (*handlers.Handler, error) {
+	handler, err := handlers.NewHandler(metricsService, pingService, auditService, privateKey, cfg, log)
+	if err != nil {
+		return nil, err
+	}
+
+	return handler, nil
+
+}
+
+func getGRPCServer(metricsService service.MetricsService, cfg *config.ServerConfig, log *zerolog.Logger) (*grpc.Server, net.Listener, error) {
+	if cfg.TrustedSubnet == "" {
+		return nil, nil, errors.New("trusted subnet is empty")
+	}
+
+	grpcMetricsServer, err := myGrpc.NewMetricsServer(metricsService, cfg, log)
+	if err != nil {
+		return nil, nil, errors.New("error creating grpc server")
+	}
+
+	lis, err := net.Listen("tcp", cfg.GrpcServerAddress)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to listen: %w", err)
+	}
+
+	trustedSubnet, err := myGrpc.ParseTrustedSubnet(cfg.TrustedSubnet)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse trusted subnet: %w", err)
+	}
+
+	var serverOpts []grpc.ServerOption
+	if trustedSubnet != nil {
+		log.Info().Str("trusted_subnet", trustedSubnet.String()).Msg("enabling trusted subnet check")
+		serverOpts = append(serverOpts, grpc.UnaryInterceptor(myGrpc.TrustedSubnetInterceptor(trustedSubnet, log)))
+	}
+
+	grpcServer := grpc.NewServer(serverOpts...)
+	myProto.RegisterMetricsServer(grpcServer, grpcMetricsServer)
+
+	return grpcServer, lis, nil
 }

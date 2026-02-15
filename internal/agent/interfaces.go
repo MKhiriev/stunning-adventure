@@ -34,3 +34,9 @@ type MemStorage interface {
 	RefreshAllMetrics(metrics ...models.Metrics) // updates or adds metrics in memory
 	Flush()                                      // clears all cached metrics
 }
+
+// MetricsSender defines a client that sends metrics to a server.
+type MetricsSender interface {
+	Send(metrics ...models.Metrics) error
+	Close() error
+}

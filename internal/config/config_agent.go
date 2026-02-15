@@ -12,10 +12,11 @@ import (
 //	Configuration for the agent component of the system.
 //	Holds network, reporting, polling, hashing, and rate-limiting settings.
 type AgentConfig struct {
-	ServerAddress  string `env:"ADDRESS"`          // address of the server to send metrics to
-	ReportInterval int64  `env:"REPORT_INTERVAL" ` // interval in seconds between sending metrics to server
-	PollInterval   int64  `env:"POLL_INTERVAL" `   // interval in seconds to read metrics from system
-	RateLimit      int64  `env:"RATE_LIMIT" `      // maximum number of requests per second
+	ServerAddress     string `env:"ADDRESS"`          // address of the server to send metrics to
+	GrpcServerAddress string `env:"GRPC_ADDRESS"`     // network address to bind the GRPC server
+	ReportInterval    int64  `env:"REPORT_INTERVAL" ` // interval in seconds between sending metrics to server
+	PollInterval      int64  `env:"POLL_INTERVAL" `   // interval in seconds to read metrics from system
+	RateLimit         int64  `env:"RATE_LIMIT" `      // maximum number of requests per second
 
 	HashKey             string `env:"KEY"`         // key used for hashing metric payloads
 	PublicCryptoKeyPath string `env:"CRYPTO_KEY" ` // public key path for encryption of data for server
@@ -45,7 +46,7 @@ func (b *agentConfigBuilder) build() (*AgentConfig, error) {
 		}
 	}
 
-	return agentConfig, nil
+	return agentConfig, agentConfig.validate()
 }
 
 func (b *agentConfigBuilder) withDefaults() *agentConfigBuilder {
@@ -99,6 +100,16 @@ func (b *agentConfigBuilder) withEnv() *agentConfigBuilder {
 
 	b.configs = append(b.configs, envCfg)
 	return b
+}
+
+func (a *AgentConfig) validate() error {
+	switch {
+	case a.ServerAddress == "" && a.GrpcServerAddress == "":
+		return errors.New("invalid Server Address: http- and grpc-server addresses are not specified")
+	case a.GrpcServerAddress != "" && a.ServerAddress == a.GrpcServerAddress:
+		return errors.New("http- and grpc-server addresses are the same")
+	}
+	return nil
 }
 
 func (a *AgentConfig) setDefault() {

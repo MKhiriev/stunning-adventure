@@ -12,8 +12,9 @@ import (
 //	Configuration for the server component.
 //	Controls server address, storage intervals, file persistence, database connection, hashing, and audit settings.
 type ServerConfig struct {
-	ServerAddress string `env:"ADDRESS"`        // network address to bind the server
-	StoreInterval int64  `env:"STORE_INTERVAL"` // interval in seconds to persist metrics to storage
+	ServerAddress     string `env:"ADDRESS"`        // network address to bind the server
+	GrpcServerAddress string `env:"GRPC_ADDRESS"`   // network address to bind the GRPC server
+	StoreInterval     int64  `env:"STORE_INTERVAL"` // interval in seconds to persist metrics to storage
 
 	FileStoragePath        string `env:"FILE_STORAGE_PATH"` // file path for metric storage
 	RestoreMetricsFromFile bool   `env:"RESTORE"`           // flag to restore metrics from file on startup
@@ -22,7 +23,9 @@ type ServerConfig struct {
 	AuditFile              string `env:"AUDIT_FILE"`        // local file path for audit logs
 	AuditURL               string `env:"AUDIT_URL"`         // external URL to send audit logs
 	PrivateCryptoKeyPath   string `env:"CRYPTO_KEY"`        // private key path for decryption of data from agent
-	JSONConfigFile         string `env:"CONFIG"`            // json file path with configs
+	TrustedSubnet          string `env:"TRUSTED_SUBNET"`    // CIDR of the trusted subnet; accepts requests only from within this subnet
+
+	JSONConfigFile string `env:"CONFIG"` // json file path with configs
 }
 
 type serverConfigBuilder struct {
@@ -119,6 +122,8 @@ func (s *ServerConfig) validate() error {
 		return errors.New("invalid Server Address")
 	case s.StoreInterval == 0:
 		return errors.New("invalid Store Interval")
+	case s.GrpcServerAddress != "" && s.ServerAddress == s.GrpcServerAddress:
+		return errors.New("http- and grpc-server addresses are the same")
 	}
 
 	return nil

@@ -30,15 +30,17 @@ type NetAddress struct {
 //	-audit-file path to audit log file
 //	-audit-url audit server endpoint
 //	-crypto-key public key path
+//	-t CIDR address of a trusted subnet
 //	-c/-config json file path with configs
 func ParseServerFlags() *ServerConfig {
-	var serverAddress NetAddress
-	var fileStoragePath, databaseDSN, hashKey, auditFilePath, auditURL, privateKeyFilePath string
+	var serverAddress, grpcServerAddress NetAddress
+	var fileStoragePath, databaseDSN, hashKey, auditFilePath, auditURL, privateKeyFilePath, trustedSubnet string
 	var storeInterval int64
 	var restore bool
 	var jsonConfigFilePath string
 
 	flag.Var(&serverAddress, "a", "Net address host:port")
+	flag.Var(&grpcServerAddress, "grpc-address", "Net grpc server address host:port")
 	flag.Int64Var(&storeInterval, "i", 0, "Store interval in seconds")
 	flag.StringVar(&fileStoragePath, "f", "", "Storage file path string")
 	flag.BoolVar(&restore, "r", false, "Boolean - restore previous metrics from file")
@@ -47,6 +49,7 @@ func ParseServerFlags() *ServerConfig {
 	flag.StringVar(&auditFilePath, "audit-file", "", "Audit file path string")
 	flag.StringVar(&auditURL, "audit-url", "", "Full Audit URL string")
 	flag.StringVar(&privateKeyFilePath, "crypto-key", "", "Private key file path")
+	flag.StringVar(&trustedSubnet, "t", "", "CIDR of the trusted subnet")
 
 	flag.StringVar(&jsonConfigFilePath, "config", "", "JSON config file path")
 	flag.StringVar(&jsonConfigFilePath, "c", "", "JSON config file path")
@@ -63,6 +66,7 @@ func ParseServerFlags() *ServerConfig {
 		AuditFile:              auditFilePath,
 		AuditURL:               auditURL,
 		PrivateCryptoKeyPath:   privateKeyFilePath,
+		TrustedSubnet:          trustedSubnet,
 		JSONConfigFile:         jsonConfigFilePath,
 	}
 }
